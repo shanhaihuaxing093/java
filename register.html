@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>注册 · Vue 版</title>
+<script src="./vue.global.prod.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    background: linear-gradient(135deg, #1a2a6c, #2a4d9b, #4a90d9);
+    color: #222;
+  }
+  .card {
+    width: 420px;
+    background: #fff;
+    border-radius: 18px;
+    padding: 36px 40px;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
+  }
+  h1 { font-size: 22px; text-align: center; margin-bottom: 6px; color: #2a4d9b; }
+  .subtitle { text-align: center; font-size: 13px; color: #999; margin-bottom: 26px; }
+  .field { margin-bottom: 18px; }
+  label { display: block; font-size: 13px; color: #555; margin-bottom: 6px; }
+  .input-row { display: flex; gap: 10px; }
+  input {
+    flex: 1;
+    width: 100%;
+    padding: 11px 14px;
+    border: 1.5px solid #dde3ee;
+    border-radius: 10px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  input:focus { border-color: #4a90d9; box-shadow: 0 0 0 3px rgba(74, 144, 217, 0.15); }
+  input.err { border-color: #e74c3c; }
+  .captcha-img {
+    height: 44px;
+    border-radius: 10px;
+    cursor: pointer;
+    border: 1.5px solid #dde3ee;
+    flex-shrink: 0;
+  }
+  .refresh-hint { font-size: 11px; color: #aaa; margin-top: 4px; }
+  .msg { font-size: 12px; margin-top: 5px; min-height: 16px; }
+  .msg.error { color: #e74c3c; }
+  .msg.ok { color: #27ae60; }
+  button.submit {
+    width: 100%;
+    padding: 13px 0;
+    border: none;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #4a90d9, #2a4d9b);
+    color: #fff;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  button.submit:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(42, 77, 155, 0.4); }
+  button.submit:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
+  .success-box { text-align: center; padding: 30px 0 10px; }
+  .success-box .icon { font-size: 52px; }
+  .success-box h2 { margin: 12px 0 6px; color: #27ae60; }
+  .success-box p { font-size: 13px; color: #777; }
+  .success-box button {
+    margin-top: 20px;
+    padding: 10px 32px;
+    border: none;
+    border-radius: 8px;
+    background: #eef2fb;
+    color: #2a4d9b;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .back { text-align: center; margin-top: 16px; }
+  .back a { font-size: 13px; color: #4a90d9; text-decoration: none; }
+  .back a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="card">
+
+    <!-- 注册成功 -->
+    <div v-if="registered" class="success-box">
+      <div class="icon">🎉</div>
+      <h2>注册成功！</h2>
+      <p>欢迎加入，<b>{{ form.username }}</b></p>
+      <button @click="registered = false">返回</button>
+    </div>
+
+    <!-- 注册表单 -->
+    <template v-else>
+      <h1>创建账号</h1>
+      <p class="subtitle">已有账号？<a href="#" style="color:#4a90d9;text-decoration:none">直接登录</a></p>
+
+      <div class="field">
+        <label>用户名</label>
+        <input v-model.trim="form.username" :class="{ err: touched && errors.username }"
+               placeholder="4-16 位字母、数字或下划线" @blur="touched = true">
+        <div class="msg error" v-if="touched && errors.username">{{ errors.username }}</div>
+      </div>
+
+      <div class="field">
+        <label>邮箱</label>
+        <input v-model.trim="form.email" :class="{ err: touched && errors.email }"
+               placeholder="example@mail.com" @blur="touched = true">
+        <div class="msg error" v-if="touched && errors.email">{{ errors.email }}</div>
+      </div>
+
+      <div class="field">
+        <label>密码</label>
+        <input type="password" v-model="form.password" :class="{ err: touched && errors.password }"
+               placeholder="至少 6 位，含字母和数字" @blur="touched = true">
+        <div class="msg error" v-if="touched && errors.password">{{ errors.password }}</div>
+      </div>
+
+      <div class="field">
+        <label>确认密码</label>
+        <input type="password" v-model="form.confirm" :class="{ err: touched && errors.confirm }"
+               placeholder="再次输入密码" @blur="touched = true">
+        <div class="msg error" v-if="touched && errors.confirm">{{ errors.confirm }}</div>
+      </div>
+
+      <div class="field">
+        <label>验证码</label>
+        <div class="input-row">
+          <input v-model.trim="form.captcha" :class="{ err: touched && errors.captcha }"
+                 maxlength="4" placeholder="输入右侧验证码" @blur="touched = true">
+          <canvas ref="captchaCanvas" class="captcha-img" width="120" height="44"
+                  title="点击刷新验证码" @click="refreshCaptcha"></canvas>
+        </div>
+        <div class="refresh-hint">看不清？点击图片刷新</div>
+        <div class="msg error" v-if="touched && errors.captcha">{{ errors.captcha }}</div>
+      </div>
+
+      <button class="submit" :disabled="loading" @click="submit">
+        {{ loading ? '提交中…' : '立即注册' }}
+      </button>
+      <div class="msg" :class="submitMsg.type" v-if="submitMsg.text">{{ submitMsg.text }}</div>
+
+      <div class="back">
+        <a href="./index.html">← 返回贪吃蛇游戏</a>
+      </div>
+    </template>
+  </div>
+</div>
+
+<script>
+const { createApp, ref, reactive, computed, onMounted } = Vue;
+
+createApp({
+  setup() {
+    const form = reactive({ username: '', email: '', password: '', confirm: '', captcha: '' });
+    const touched = ref(false);
+    const registered = ref(false);
+    const loading = ref(false);
+    const submitMsg = ref({ text: '', type: '' });
+    const captchaCanvas = ref(null);
+    let captchaCode = '';
+
+    const CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+    function refreshCaptcha() {
+      const cv = captchaCanvas.value;
+      if (!cv) return;
+      const ctx = cv.getContext('2d');
+      captchaCode = Array.from({ length: 4 }, () => CHARS[Math.floor(Math.random() * CHARS.length)]).join('');
+
+      // 背景渐变
+      const grad = ctx.createLinearGradient(0, 0, 120, 44);
+      grad.addColorStop(0, '#f0f4ff');
+      grad.addColorStop(1, '#dfe8f8');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 120, 44);
+
+      // 干扰线
+      for (let i = 0; i < 5; i++) {
+        ctx.strokeStyle = `rgba(74,144,217,${0.15 + Math.random() * 0.2})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(Math.random() * 120, Math.random() * 44);
+        ctx.bezierCurveTo(
+          Math.random() * 120, Math.random() * 44,
+          Math.random() * 120, Math.random() * 44,
+          Math.random() * 120, Math.random() * 44
+        );
+        ctx.stroke();
+      }
+
+      // 噪点
+      for (let i = 0; i < 40; i++) {
+        ctx.fillStyle = `rgba(90,110,150,${Math.random() * 0.35})`;
+        ctx.fillRect(Math.random() * 120, Math.random() * 44, 1.5, 1.5);
+      }
+
+      // 字符
+      const colors = ['#2a4d9b', '#4a90d9', '#c0392b', '#27ae60', '#8e44ad'];
+      captchaCode.split('').forEach((ch, i) => {
+        ctx.save();
+        ctx.font = `bold ${22 + Math.floor(Math.random() * 6)}px Georgia, serif`;
+        ctx.fillStyle = colors[i % colors.length];
+        ctx.translate(18 + i * 27, 30);
+        ctx.rotate((Math.random() - 0.5) * 0.55);
+        ctx.fillText(ch, 0, 0);
+        ctx.restore();
+      });
+    }
+
+    const errors = computed(() => {
+      const e = {};
+      if (!/^\w{4,16}$/.test(form.username)) e.username = '用户名需为 4-16 位字母、数字或下划线';
+      if (!/^[\w.+-]+@[\w-]+\.[\w.]+$/.test(form.email)) e.email = '请输入正确的邮箱地址';
+      if (form.password.length < 6 || !/[a-zA-Z]/.test(form.password) || !/\d/.test(form.password))
+        e.password = '密码至少 6 位，且需同时包含字母和数字';
+      if (form.confirm !== form.password || !form.confirm) e.confirm = '两次输入的密码不一致';
+      if (form.captcha.toUpperCase() !== captchaCode) e.captcha = '验证码错误';
+      return e;
+    });
+
+    function submit() {
+      touched.value = true;
+      submitMsg.value = { text: '', type: '' };
+      if (Object.keys(errors.value).length) {
+        submitMsg.value = { text: '请检查标红的输入项', type: 'error' };
+        refreshCaptcha();
+        form.captcha = '';
+        return;
+      }
+      loading.value = true;
+      // 模拟注册请求
+      setTimeout(() => {
+        loading.value = false;
+        registered.value = true;
+        console.log('注册信息：', { ...form, password: '***' });
+      }, 800);
+    }
+
+    onMounted(refreshCaptcha);
+
+    return { form, touched, registered, loading, submitMsg, errors, captchaCanvas, refreshCaptcha, submit };
+  },
+}).mount('#app');
+</script>
+</body>
+</html>

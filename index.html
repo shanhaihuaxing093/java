@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>贪吃蛇 · Vue 版</title>
+<script src="./vue.global.prod.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+    color: #e8f1f2;
+  }
+  .app {
+    display: flex;
+    gap: 28px;
+    padding: 32px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 20px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  }
+  h1 {
+    font-size: 22px;
+    letter-spacing: 4px;
+    text-align: center;
+    margin-bottom: 16px;
+    color: #7ef9a2;
+    text-shadow: 0 0 12px rgba(126, 249, 162, 0.4);
+  }
+  .board-wrap { position: relative; }
+  canvas {
+    display: block;
+    border-radius: 12px;
+    background: #10241c;
+    box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.6);
+  }
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    background: rgba(8, 20, 14, 0.78);
+    border-radius: 12px;
+    text-align: center;
+  }
+  .overlay .big { font-size: 26px; font-weight: bold; }
+  .overlay .sub { font-size: 14px; opacity: 0.8; }
+  .panel { width: 200px; display: flex; flex-direction: column; gap: 14px; }
+  .card {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 14px 16px;
+  }
+  .card .label { font-size: 12px; opacity: 0.65; margin-bottom: 4px; }
+  .card .value { font-size: 26px; font-weight: bold; color: #ffd166; }
+  .card .value.hi { color: #7ef9a2; }
+  button {
+    border: none;
+    border-radius: 10px;
+    padding: 12px 0;
+    font-size: 15px;
+    font-weight: bold;
+    cursor: pointer;
+    color: #08130c;
+    background: linear-gradient(135deg, #7ef9a2, #4fd1c5);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  button:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(126, 249, 162, 0.35); }
+  .speed-group { display: flex; gap: 6px; }
+  .speed-group button {
+    flex: 1;
+    padding: 8px 0;
+    font-size: 13px;
+    background: rgba(255, 255, 255, 0.12);
+    color: #e8f1f2;
+  }
+  .speed-group button.active {
+    background: linear-gradient(135deg, #ffd166, #ff9f43);
+    color: #3d2600;
+  }
+  .tips { font-size: 12px; line-height: 1.9; opacity: 0.7; }
+  .tips kbd {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-family: inherit;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="app">
+    <div>
+      <h1>🐍 贪吃蛇</h1>
+      <div class="board-wrap">
+        <canvas ref="canvas" width="480" height="480"></canvas>
+        <div class="overlay" v-if="!running">
+          <div class="big" v-if="dead">游戏结束 💀</div>
+          <div class="big" v-else>准备开始</div>
+          <div class="sub" v-if="dead">本局得分：{{ score }}　最高分：{{ highScore }}</div>
+          <div class="sub" v-else>用方向键或 WASD 控制方向</div>
+          <button @click="start">{{ dead ? '再来一局' : '开始游戏' }}</button>
+        </div>
+        <div class="overlay" v-else-if="paused">
+          <div class="big">已暂停 ⏸</div>
+          <div class="sub">按 空格 或点击下方按钮继续</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="card">
+        <div class="label">当前得分</div>
+        <div class="value">{{ score }}</div>
+      </div>
+      <div class="card">
+        <div class="label">历史最高</div>
+        <div class="value hi">{{ highScore }}</div>
+      </div>
+      <div class="card">
+        <div class="label">速度</div>
+        <div class="speed-group">
+          <button v-for="s in speeds" :key="s.name"
+                  :class="{ active: speedLevel === s.name }"
+                  @click="speedLevel = s.name">{{ s.name }}</button>
+        </div>
+      </div>
+      <button v-if="running" @click="paused = !paused">{{ paused ? '继续' : '暂停' }}</button>
+      <div class="card tips">
+        <kbd>↑↓←→</kbd> / <kbd>WASD</kbd> 移动<br>
+        <kbd>空格</kbd> 暂停 / 继续<br>
+        撞墙或咬到自己即结束
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const { createApp, ref, computed, watch, onMounted, onBeforeUnmount } = Vue;
+
+createApp({
+  setup() {
+    const GRID = 24;               // 网格数 24x24
+    const CELL = 480 / GRID;       // 单元格像素
+    const canvas = ref(null);
+    const ctx = computed(() => canvas.value ? canvas.value.getContext('2d') : null);
+
+    const running = ref(false);
+    const paused = ref(false);
+    const dead = ref(false);
+    const score = ref(0);
+    const highScore = ref(Number(localStorage.getItem('snakeHiScore') || 0));
+
+    const speeds = [
+      { name: '慢', ms: 180 },
+      { name: '中', ms: 120 },
+      { name: '快', ms: 70 },
+    ];
+    const speedLevel = ref('中');
+    const interval = computed(() => speeds.find(s => s.name === speedLevel.value).ms);
+
+    let snake, dir, nextDir, food, timer = null;
+
+    function randomFood() {
+      while (true) {
+        const f = {
+          x: Math.floor(Math.random() * GRID),
+          y: Math.floor(Math.random() * GRID),
+        };
+        if (!snake.some(s => s.x === f.x && s.y === f.y)) return f;
+      }
+    }
+
+    function reset() {
+      snake = [{ x: 12, y: 12 }, { x: 11, y: 12 }, { x: 10, y: 12 }];
+      dir = { x: 1, y: 0 };
+      nextDir = { x: 1, y: 0 };
+      score.value = 0;
+      dead.value = false;
+      food = randomFood();
+    }
+
+    function draw() {
+      const c = ctx.value;
+      if (!c) return;
+      c.fillStyle = '#10241c';
+      c.fillRect(0, 0, 480, 480);
+
+      // 网格线
+      c.strokeStyle = 'rgba(255,255,255,0.04)';
+      for (let i = 1; i < GRID; i++) {
+        c.beginPath(); c.moveTo(i * CELL, 0); c.lineTo(i * CELL, 480); c.stroke();
+        c.beginPath(); c.moveTo(0, i * CELL); c.lineTo(480, i * CELL); c.stroke();
+      }
+
+      // 食物
+      c.fillStyle = '#ff6b6b';
+      c.shadowColor = '#ff6b6b';
+      c.shadowBlur = 12;
+      c.beginPath();
+      c.arc(food.x * CELL + CELL / 2, food.y * CELL + CELL / 2, CELL / 2 - 3, 0, Math.PI * 2);
+      c.fill();
+      c.shadowBlur = 0;
+
+      // 蛇身
+      snake.forEach((s, i) => {
+        const t = i / snake.length;
+        c.fillStyle = i === 0 ? '#7ef9a2' : `rgba(126,249,162,${0.9 - t * 0.55})`;
+        c.beginPath();
+        c.roundRect(s.x * CELL + 1.5, s.y * CELL + 1.5, CELL - 3, CELL - 3, 5);
+        c.fill();
+      });
+
+      // 蛇眼睛
+      const head = snake[0];
+      c.fillStyle = '#08130c';
+      const ex = head.x * CELL + CELL / 2, ey = head.y * CELL + CELL / 2;
+      const off = 4;
+      if (dir.x !== 0) {
+        c.fillRect(ex - 2 + dir.x * 3, ey - off, 3, 3);
+        c.fillRect(ex - 2 + dir.x * 3, ey + off - 3, 3, 3);
+      } else {
+        c.fillRect(ex - off, ey - 2 + dir.y * 3, 3, 3);
+        c.fillRect(ex + off - 3, ey - 2 + dir.y * 3, 3, 3);
+      }
+    }
+
+    function step() {
+      dir = nextDir;
+      const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+
+      // 撞墙 / 咬自己
+      if (head.x < 0 || head.x >= GRID || head.y < 0 || head.y >= GRID ||
+          snake.some(s => s.x === head.x && s.y === head.y)) {
+        gameOver();
+        return;
+      }
+      snake.unshift(head);
+
+      if (head.x === food.x && head.y === food.y) {
+        score.value += 10;
+        food = randomFood();
+      } else {
+        snake.pop();
+      }
+      draw();
+    }
+
+    function gameOver() {
+      running.value = false;
+      dead.value = true;
+      clearInterval(timer);
+      timer = null;
+      if (score.value > highScore.value) {
+        highScore.value = score.value;
+        localStorage.setItem('snakeHiScore', String(score.value));
+      }
+    }
+
+    function start() {
+      reset();
+      draw();
+      running.value = true;
+      paused.value = false;
+    }
+
+    watch([interval, paused], () => {
+      clearInterval(timer);
+      timer = null;
+      if (running.value && !paused.value) {
+        timer = setInterval(step, interval.value);
+      }
+    });
+    watch(running, (v) => {
+      clearInterval(timer);
+      timer = null;
+      if (v && !paused.value) timer = setInterval(step, interval.value);
+    });
+
+    function onKey(e) {
+      const map = {
+        ArrowUp: { x: 0, y: -1 }, KeyW: { x: 0, y: -1 },
+        ArrowDown: { x: 0, y: 1 }, KeyS: { x: 0, y: 1 },
+        ArrowLeft: { x: -1, y: 0 }, KeyA: { x: -1, y: 0 },
+        ArrowRight: { x: 1, y: 0 }, KeyD: { x: 1, y: 0 },
+      };
+      if (map[e.code]) {
+        e.preventDefault();
+        const d = map[e.code];
+        // 禁止 180 度掉头
+        if (d.x !== -dir.x || d.y !== -dir.y) nextDir = d;
+      } else if (e.code === 'Space') {
+        e.preventDefault();
+        if (running.value) paused.value = !paused.value;
+      }
+    }
+
+    onMounted(() => {
+      reset();
+      draw();
+      window.addEventListener('keydown', onKey);
+    });
+    onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
+
+    return { canvas, running, paused, dead, score, highScore, speeds, speedLevel, start };
+  },
+}).mount('#app');
+</script>
+</body>
+</html>
