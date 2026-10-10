@@ -1,0 +1,4 @@
+﻿
+PORT_CHECK: 8081/5173/5174 均无监听
+JAVA_CHECK: 无 java 进程
+DONE
