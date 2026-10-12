@@ -140,8 +140,54 @@ body {
 }
 .switch a:hover { background: var(--ocean-3); }
 
-/* 小屏适配 */
-@media (max-width: 480px) {
-  .sponge-card { padding: 24px 20px 20px; border-radius: 22px; }
-  .title { font-size: 22px; }
+/* ===========================================================
+   响应式适配
+   断点：<=768px 平板 / <=480px 手机 / <=360px 小屏
+   =========================================================== */
+@media (max-width: 768px) {
+  /* 手机上海床别挤掉内容，底部留白小一点 */
+  .ocean { padding: 40px 14px 120px; align-items: flex-start; }
+  .floor { height: 96px; }
+  .seaweed { bottom: 46px; width: 11px; }
+
+  .sponge-card { animation: none; box-shadow: 0 10px 0 var(--sponge-border), 0 16px 28px rgba(0, 0, 0, .4); }
+  .title { font-size: 23px; letter-spacing: 1px; }
+  .btn { font-size: 16px; padding: 13px; border-radius: 18px; }
 }
+
+@media (max-width: 480px) {
+  .ocean { padding: 24px 10px 104px; }
+  .sponge-card {
+    padding: 22px 16px 18px;
+    border-radius: 22px;
+    border-width: 4px;
+  }
+  .title { font-size: 21px; letter-spacing: 0; }
+  .subtitle { font-size: 12px; }
+  .field { margin-top: 13px; }
+  .field input { padding: 11px 12px 11px 40px; font-size: 16px; } /* 16px 可避免 iOS 自动放大 */
+  .input-wrap .icon { left: 12px; font-size: 16px; }
+  .btn { padding: 12px; font-size: 15px; border-width: 3px; }
+  .tips { font-size: 12px; }
+  .switch { font-size: 13px; }
+
+  /* 表格页：缩小字号，横向可滚动，不换行挤压 */
+  .table-wrap { padding: 6px; }
+  table { font-size: 12px; }
+  th, td { padding: 6px 4px; white-space: nowrap; }
+}
+
+@media (max-width: 360px) {
+  .sponge-card { padding: 18px 12px 14px; }
+  .title { font-size: 19px; }
+}
+
+/* 尊重系统「减少动态效果」设置 */
+@media (prefers-reduced-motion: reduce) {
+  .sponge-card,
+  .bubble,
+  .seaweed {
+    animation: none !important;
+  }
+}
+
