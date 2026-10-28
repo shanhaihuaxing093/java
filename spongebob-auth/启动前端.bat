@@ -7,11 +7,15 @@ cd /d "%APPDIR%"
 title 比奇堡前端启动器 (Vue3 + Vite)
 
 rem ============================================================
-rem  比奇堡前端一键启动
+rem  比奇堡前端一键启动（提速版）
 rem  · 全部路径都从脚本自身所在目录推导，可整个文件夹搬走
-rem  · 不依赖 node_modules：每次开机它会被清空，脚本会自动重装
+rem  · 不依赖 node_modules：每次开机它会被清空
+rem      1 node_modules 完整就直接用
+rem      2 没了就先从用户缓存解压恢复（秒级）
+rem      3 缓存也没有才联网 npm ci / install
+rem  · 联网安装成功后会自动更新缓存 zip，下次开机秒级恢复
 rem  · 端口从 .env 的 VITE_PORT 读，读不到就用 5173
-rem  · 用法：双击，或  启动前端.bat /nopause（被别的脚本调用时不暂停）
+rem  · 用法：双击，或 启动前端.bat /nopause（被别的脚本调用时不暂停）
 rem ============================================================
 
 set "PORT=5173"
@@ -21,6 +25,9 @@ if exist "%APPDIR%\.env" (
     )
 )
 for /f "tokens=* delims= " %%p in ("%PORT%") do set "PORT=%%p"
+
+set "CACHEDIR=%USERPROFILE%\.bikini-cache"
+set "CACHEZIP=%CACHEDIR%\spongebob-node_modules.zip"
 
 echo ============================================
 echo   比奇堡前端启动器   Vue3 + Vite
@@ -53,19 +60,36 @@ if exist "%APPDIR%\node_modules\vite\package.json" (
     goto :dev
 )
 if exist "%APPDIR%\node_modules" (
-    echo     node_modules 不完整（可能被重置了一半），重装。
+    echo     node_modules 不完整（可能被重置了一半），删掉重来。
+    rd /s /q "%APPDIR%\node_modules" >nul 2>&1
 )
-echo     每次开机 node_modules 都会被清空，正在安装（首次约 1~2 分钟）...
+if exist "%CACHEZIP%" (
+    echo     发现依赖缓存，正在解压恢复（通常几秒，比联网安装快得多）...
+    tar -xf "%CACHEZIP%" -C "%APPDIR%" >nul 2>&1
+    if not errorlevel 1 (
+        if exist "%APPDIR%\node_modules\vite\package.json" (
+            echo     缓存恢复成功。
+            goto :dev
+        )
+    )
+    echo     [警告] 缓存不可用，删掉后改为联网安装。
+    if exist "%APPDIR%\node_modules" rd /s /q "%APPDIR%\node_modules" >nul 2>&1
+)
+echo     正在联网安装依赖（约 1~2 分钟，取决于网速）...
 if exist "%APPDIR%\package-lock.json" (
-    call npm.cmd ci --no-audit --no-fund
-    if not errorlevel 1 goto :dev
+    call npm.cmd ci --no-audit --no-fund --prefer-offline
+    if not errorlevel 1 goto :installed
     echo     npm ci 没成功，改用 npm install ...
 )
-call npm.cmd install --no-audit --no-fund
+call npm.cmd install --no-audit --no-fund --prefer-offline
 if errorlevel 1 (
     echo     [错误] 依赖安装失败，检查网络或手动执行 npm install 看具体报错。
     goto :fail
 )
+
+:installed
+echo     安装成功，顺手更新依赖缓存（下次开机秒级恢复）...
+call :updateCache
 echo.
 
 :dev
@@ -80,6 +104,8 @@ echo ============================================
 echo   前端已就绪
 echo     登录页   http://localhost:%PORT%/login
 echo     注册页   http://localhost:%PORT%/register
+echo     首页     http://localhost:%PORT%/home
+echo     预览入口 http://localhost:%PORT%/home-preview.html
 echo     居民名单 http://localhost:%PORT%/users
 echo ============================================
 echo.
@@ -94,6 +120,13 @@ if /i not "%1"=="/nopause" pause
 exit /b 1
 
 rem ==================== 子过程 ====================
+
+:updateCache
+rem 把刚装好的 node_modules 压进用户缓存；机器重置清掉 node_modules 后可秒级恢复
+if not exist "%CACHEDIR%" mkdir "%CACHEDIR%" >nul 2>&1
+if exist "%CACHEZIP%" del /f /q "%CACHEZIP%" >nul 2>&1
+tar -a -cf "%CACHEZIP%" -C "%APPDIR%" node_modules >nul 2>&1
+exit /b 0
 
 :waitPort
 rem %1=端口  %2=最多等几秒  %3=名称

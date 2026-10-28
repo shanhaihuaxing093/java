@@ -6,7 +6,8 @@ import UsersView from '../views/UsersView.vue'
 import NotFoundView from '../views/NotFoundView.vue'
 
 const routes = [
-  { path: '/', redirect: '/login' },
+  // 已登录（本地有令牌）直接进首页，否则去登录页；令牌有效性仍由后端校验
+  { path: '/', redirect: () => (localStorage.getItem('bob_token') ? '/home' : '/login') },
   { path: '/login', name: 'login', component: LoginView },
   { path: '/register', name: 'register', component: RegisterView },
   {

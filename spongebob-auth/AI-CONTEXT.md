@@ -19,8 +19,13 @@
 
 | 端 | 目录 | 技术栈 |
 | --- | --- | --- |
-| 前端 | `C:\Users\Administrator\Desktop\spongebob-auth` | Vue 3.5 + Vite 5.4 + vue-router 4 + axios 1.7，**无 UI 库**（纯手写 CSS 主题） |
-| 后端 | `D:\workSpace\springBootTest` | SpringBoot 3.4.5 + MyBatis-Plus 3.5.9 + MySQL 8 |
+| 前端 | `D:\workSpace\java\spongebob-auth`（WorkBuddy 工作区有同步副本） | Vue 3.5 + Vite 5.4 + vue-router 4 + axios 1.7，**无 UI 库**（纯手写 CSS 主题） |
+| 后端 | `D:\workSpace\springBootTest` | SpringBoot 3.4.5 + MyBatis-Plus 3.5.9 + MySQL 8（**⚠️ 2026-10-28 起认证代码被重置清空，待复原**） |
+
+> **当前状态速览**：前端四页（登录/注册/首页/用户列表）已完成；
+> 后端只剩 `SpringBootTestApplication` + `UserController`，`/api/auth/*`、`/api/user/page` 全 404；
+> 启动脚本已含三级兜底 + 秒级缓存恢复（`%USERPROFILE%\.bikini-cache`）。
+> 开机先看 `AI-BOOT.md` 第 0 节。
 
 ---
 
@@ -28,8 +33,9 @@
 
 | 项目 | 值 |
 | --- | --- |
-| 前端目录 | `C:\Users\Administrator\Desktop\spongebob-auth` |
-| 后端目录 | `D:\workSpace\springBootTest` |
+| 前端目录 | `D:\workSpace\java\spongebob-auth`（脚本用脚本自身位置定位，搬走也能跑） |
+| 后端目录 | `D:\workSpace\springBootTest`（**认证代码 2026-10-28 被重置清空，待复原**） |
+| 依赖缓存 | `%USERPROFILE%\.bikini-cache\`：`spongebob-node_modules.zip`（恢复 0.5s）+ 后端成品 jar（robocopy 秒级恢复），开机重置**不会**清掉它，启动脚本自动用、自动更新 |
 | 前端开发端口 | **5173**（`VITE_PORT`；被占用时 Vite 自动顺延 5174） |
 | 代理规则 | `/api` → `http://localhost:8081`（`vite.config.js` 读 `.env` 的 `VITE_BACKEND_URL`） |
 | 后端端口 | **8081**（`application-dev.properties` 的 `server.port`；`spring.profiles.active=dev`） |
@@ -58,9 +64,10 @@
 ## 2. 目录地图
 
 ```
-C:\Users\Administrator\Desktop\spongebob-auth\   （前端）
+D:\workSpace\java\spongebob-auth\   （前端，曾位于桌面，已迁移）
 ├─ AI-BOOT.md                 ★ 开机速读卡：先读它（专治「每次开机重建」）
 ├─ AI-CONTEXT.md              ← 本文件（完整档案）
+├─ home-preview.html          ★ 仅本地开发用：写假令牌绕守卫直达 /home 预览首页
 ├─ .env                       ★ 端口/后端地址/超时（dev 和 build 都读）
 ├─ .env.example               ← 模板，复制成 .env.local 覆盖
 ├─ .gitignore                 ← 忽略 node_modules / dist / .env.local
@@ -80,55 +87,52 @@ C:\Users\Administrator\Desktop\spongebob-auth\   （前端）
 │  └─ check-bat.py            ← .bat 静态自检（标签引用 / 括号配平 / 引号 / 编码）
 └─ src
    ├─ main.js                 ← createApp + router + 全局样式
-   ├─ App.vue                 ← <router-view> + <GlobalLoading>
-   ├─ router\index.js         ← 守卫 + 404 兜底 + scrollBehavior
+   ├─ App.vue                 ← <router-view> + <GlobalLoading> + <ToastHost>
+   ├─ router\index.js         ← 守卫 + 404 兜底；根路径「有令牌进 /home，无令牌进 /login」
    ├─ utils\loading.js        ★ 全局请求计数器（顶栏进度条用）
+   ├─ utils\toast.js          ← 极轻量全局提示（无 UI 库 / 无 Pinia）
    ├─ api\request.js          ← axios 实例、令牌注入、401 清态跳登录、进度条开关
    ├─ api\auth.js             ← login / register / checkUsername / hello / profile / logout
    ├─ api\user.js             ← userPage（分页 + 关键字）
+   ├─ api\home.js             ★ 首页接口层：预留 /api/home/*，失败自动降级本地 Mock
+   ├─ config\nav.js           ★ 首页静态数据：导航 / 蟹堡菜单 / 快捷入口 / 公告 / Mock
    ├─ styles\global.css       ★ 主题全在这里（海洋背景、气泡、海绵卡片、按钮、响应式）
    ├─ components\OceanBg.vue  ← 海底场景（气泡 + 海床 + 海草），用 <slot> 包内容
    ├─ components\SpongeBob.vue← 海绵宝宝 SVG 头像
    ├─ components\GlobalLoading.vue ← 顶部加载进度条
+   ├─ components\AppTopBar.vue ← 顶部导航栏：品牌 + 全局搜索栏 + 用户菜单
+   ├─ components\AppSideBar.vue← 左侧导航（≤768px 变抽屉）
+   ├─ components\ToastHost.vue ← 全局提示渲染（挂 App.vue）
    └─ views\
-      ├─ LoginView.vue        ← 登录页
+      ├─ LoginView.vue        ← 登录页（成功后跳 /home）
       ├─ RegisterView.vue     ← 注册页
-      ├─ HomeView.vue         ← 首页（用户信息 + 后端连通自检 + 令牌有效期）
+      ├─ HomeView.vue         ★ 首页仪表盘：欢迎横幅 + 概览卡片 + 快捷入口 + 公告 + 最近居民
       ├─ UsersView.vue        ← 用户列表（分页 + 搜索）
       └─ NotFoundView.vue     ← 404 页
 
-D:\workSpace\springBootTest\                    （后端）
-├─ AI-BOOT.md                 ★ 后端开机速读卡
-├─ AI-README.md               ← 后端项目说明 + 接口一览（给人看的）
+D:\workSpace\springBootTest\                    （后端，⚠️ 2026-10-28 被重置回滚过一轮）
+├─ AI-BOOT.md                 ★ 后端开机速读卡（2026-10-28 重写，含待复原清单）
 ├─ .gitattributes / .gitignore ← 忽略 target/log/.idea；`*.bat` 标 binary 防换行转换
-├─ pom.xml                    ← Boot 3.4.5 + mybatis-plus-spring-boot3-starter + mybatis-plus-jsqlparser
+├─ pom.xml                    ← ⚠️ 目前是回滚后的旧版（web+thymeleaf），**缺** mybatis-plus 两件套
 ├─ mvnw / mvnw.cmd / .mvn     ← Maven wrapper
-├─ sql\spongebob_auth.sql     ← 与前端同一份建库脚本（内容一致，只是换行符不同）
-├─ 启动后端.bat / 停止后端.bat   ← 启动脚本支持 /force：强制 clean 重打包
-├─ docs\
-│  └─ Spring-官方模板.md       ← Spring Initializr 自带的 HELP.md，无引用，仅作参考
+├─ sql\spongebob_auth.sql     ← 2026-10-28 从前端镜像过来，与前端同一份建库脚本
+├─ 启动后端.bat / 停止后端.bat   ← 2026-10-28 重建；jar 三级兜底（现成/缓存/打包）+ /force + /nopause
+├─ HELP.md                    ← Spring Initializr 模板
 ├─ tools\
 │  ├─ check-build.ps1         ← 判断 jar 要不要重打（exit 0 跳过 / 1 重打）
-│  └─ bat-to-gbk.py
+│  ├─ bat-to-gbk.py          ← 与前端同一份
+│  └─ check-bat.py           ← 与前端同一份
 └─ src\main\
-   ├─ java\com\fenglin\springboottest\
+   ├─ java\com\fenglin\springboottest\   ← ⚠️ 只剩下面两个，其余 13 个业务文件待复原
    │  ├─ SpringBootTestApplication.java
    │  ├─ UserController.java        ← 项目原有的 Thymeleaf 教学示例（勿删）
-   │  ├─ common\Result.java         ← 统一返回体 { code, msg, data }
-   │  ├─ common\GlobalExceptionHandler.java ← 异常也转成 Result（限定 controller 包）
-   │  ├─ config\WebConfig.java      ← 拦截器注册 + MapperScan + 跨域兜底
-   │  ├─ config\MybatisPlusConfig.java ← 分页插件（**必须单独一个类**，见坑 5.3）
-   │  ├─ interceptor\TokenInterceptor.java ← 校验 Authorization，失败返回 HTTP200+code401（见 3.3）
-   │  ├─ controller\AuthController.java
-   │  ├─ controller\SysUserController.java
-   │  ├─ service\AuthService.java
-   │  ├─ mapper\SysUserMapper.java
-   │  ├─ entity\SysUser.java        ← 密码 @JsonIgnore；token 要返回给前端，列表接口手动置空
-   │  ├─ dto\LoginDTO.java / RegisterDTO.java
-   │  └─ util\Md5Util.java          ← 加盐 MD5，main() 里能做自检
+   │  └─ （common\Result.java、GlobalExceptionHandler、config\WebConfig、config\MybatisPlusConfig、
+   │     interceptor\TokenInterceptor、controller\AuthController、controller\SysUserController、
+   │     service\AuthService、mapper\SysUserMapper、entity\SysUser、dto\LoginDTO/RegisterDTO、
+   │     util\Md5Util 全部待复原，接口约定见第 3 节）
    └─ resources\
-      ├─ application.properties     ← 激活 dev、日志
-      └─ application-dev.properties ★ 8081 + 数据源 + MyBatis-Plus 配置
+      ├─ application.properties     ← 激活 dev、日志（⚠️ 日志格式里的中文注释是乱码，待修）
+      └─ application-dev.properties ★ 目前只剩 server.port=8081；**数据源等配置待复原**
 ```
 
 ---
@@ -274,7 +278,8 @@ java -jar target/springBootTest-0.0.1-SNAPSHOT.jar --server.port=8081
 | ~~低~~ | ~~移动端适配只做了最小宽度~~ | ✅ 已补：768 / 480 / 360 三档断点 |
 | ~~低~~ | ~~没有 `.gitignore`~~ | ✅ 已补 |
 | ~~低~~ | ~~每次启动都 full build，浪费 10~60 秒~~ | ✅ **本轮已补**：`check-build.ps1` 比时间戳，jar 最新就跳过打包 |
-| **高** | **两个工程都没进 git，源码只存在本地磁盘**——后端上次就是这样整份丢的 | 建议 `git init` + 首次提交；至少定期把两份源码压成包放第三方位置 |
+| **高** | **后端认证代码整包丢失**（2026-10-28 机器重置回滚）：只剩 Application + UserController，pom 也没有 mybatis-plus 了，登录注册全 404 | 复原 13 个 Java 文件 + pom 依赖 + 数据源配置（约定见第 3 节，清单见后端 AI-BOOT.md）；scripts 已复原完 |
+| **高** | **两个工程都没进 git，源码只存在本地磁盘**——后端已经这样整份丢过两回 | 建议 `git init` + 首次提交；至少定期把两份源码压成包放第三方位置 |
 | 中 | 后端只有「查列表」，没有增删改 | 缺：改昵称 / 改密码 / 禁用启用 / 删除用户 |
 | 中 | Token 是 UUID 而非 JWT（无自解析、无刷新） | 换 JWT，或加刷新令牌机制 |
 | 中 | 没有 Pinia 状态管理 | 用户量小可先不做（全局 loading 用 reactive 单例代替） |
@@ -317,6 +322,23 @@ java -jar target/springBootTest-0.0.1-SNAPSHOT.jar --server.port=8081
 - 新增 `tools/test-api.sh`（28 项验收脚本从工作区收进项目）
 - 修掉两个小毛病：`.env.example` 的 `//` 注释、`application.properties` 的中文注释变 `?` 及 `logging.pattern.file` 值写错
 
+**第四轮（2026-10-28 · 首页 + 提速）**
+- 前端从桌面迁到 `D:\workSpace\java\spongebob-auth`，并复制了一份到 WorkBuddy 工作区开发
+- **首页改版**：HomeView 重写为仪表盘（欢迎横幅 + 概览卡片 + 快捷入口 + 公告 + 最近居民）；
+  新增 `AppTopBar`（品牌 + 全局搜索栏 + 用户菜单）、`AppSideBar`（≤768px 抽屉）、
+  `ToastHost` + `utils/toast.js`、`config/nav.js`、`api/home.js`（预留 /api/home/*，失败降级 Mock）
+- 新增 `home-preview.html`（本地开发预览首页用：写假令牌绕守卫）
+- 路由根路径改为「有令牌进 /home，无令牌进 /login」；`npm run build` 通过
+- 改动已同步回 D 盘原项目（旧文件备份在其 `backup-20261028-首页改版前/`）
+
+**第五轮（2026-10-28 · 一键启动提速 + 后端脚本复原）**
+- 发现后端整包被重置回滚：启动脚本、tools、sql、AI 文档、**认证 Java 代码**全没了
+- 重建 `启动后端.bat` / `停止后端.bat` / `tools/check-build.ps1`，镜像 `bat-to-gbk.py` / `check-bat.py` / sql 到后端
+- **启动提速**：新增 `%USERPROFILE%\.bikini-cache`（node_modules 压缩包 + 成品 jar，重置清不掉）。
+  `启动前端.bat` / `启动后端.bat` 改为三级兜底（现成 → 解缓存秒级恢复 → 联网/打包），
+  装好/打包成功自动更新缓存。实测：依赖压缩 2.2s、恢复 0.5s（代替 45s+ npm ci）
+- 重写前后端两份 `AI-BOOT.md`（当前状态、缓存机制、验证命令、待复原清单）
+
 ---
 
 ## 8. 机器重置后的复原步骤（重要！）
@@ -324,26 +346,34 @@ java -jar target/springBootTest-0.0.1-SNAPSHOT.jar --server.port=8081
 开机发现后端目录空了 / 库没了，按这个顺序来：
 
 ```bash
+# 0) 最快路径：缓存都在 %USERPROFILE%\.bikini-cache，直接解压/复制即可，不用联网
+FE="D:/workSpace/java/spongebob-auth"
+CACHE="/c/Users/Administrator/.bikini-cache"
+
 # 1) 数据库（MySQL 服务要已启动，监听 3306）
 "/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe" -uroot -p123456 \
-  < "C:/Users/Administrator/Desktop/spongebob-auth/sql/spongebob_auth.sql"
+  < "$FE/sql/spongebob_auth.sql"
 
-# 2) 前端依赖
-cd "C:/Users/Administrator/Desktop/spongebob-auth" && npm ci
+# 2) 前端依赖：优先从缓存解压（秒级），缓存没有再 npm ci
+[ -f "$CACHE/spongebob-node_modules.zip" ] && tar -xf "$CACHE/spongebob-node_modules.zip" -C "$FE" \
+  || (cd "$FE" && npm ci)
 
-# 3) 后端打包（Bash 里 mvnw.cmd 跑不通，直接用缓存的 maven 发行包跑 Launcher）
+# 3) 后端：优先从缓存复制 jar（秒级），缓存没有再打包（Bash 里 mvnw.cmd 跑不通，
+#    用缓存的 maven 发行包跑 Launcher）
 cd /d/workSpace/springBootTest
-MA="C:/Users/Administrator/.m2/wrapper/dists/apache-maven-3.9.9-bin/4nf9hui3q3djbarqar9g711ggc/apache-maven-3.9.9"
-java -classpath "$MA/boot/plexus-classworlds-2.8.0.jar" \
-  "-Dclassworlds.conf=$MA/bin/m2.conf" "-Dmaven.home=$MA" \
-  "-Dmaven.multiModuleProjectDirectory=$(pwd -W)" \
-  org.codehaus.plexus.classworlds.launcher.Launcher -B -DskipTests clean package
+[ -f "$CACHE/springBootTest-0.0.1-SNAPSHOT.jar" ] && cp "$CACHE/springBootTest-0.0.1-SNAPSHOT.jar" target/ || {
+  MA="C:/Users/Administrator/.m2/wrapper/dists/apache-maven-3.9.9-bin/4nf9hui3q3djbarqar9g711ggc/apache-maven-3.9.9"
+  java -classpath "$MA/boot/plexus-classworlds-2.8.0.jar" \
+    "-Dclassworlds.conf=$MA/bin/m2.conf" "-Dmaven.home=$MA" \
+    "-Dmaven.multiModuleProjectDirectory=$(pwd -W)" \
+    org.codehaus.plexus.classworlds.launcher.Launcher -B -DskipTests clean package
+}
 
 # 4) 起后端（必须显式指定端口，见 1.坑 2）
 java -jar target/springBootTest-0.0.1-SNAPSHOT.jar --server.port=8081 &
 
 # 5) 起前端
-cd "C:/Users/Administrator/Desktop/spongebob-auth" && npm run dev &
+cd "$FE" && npm run dev &
 ```
 
 > 日常给用户用的话，直接双击 `启动全部.bat` 就行（它会调两边的脚本）；
