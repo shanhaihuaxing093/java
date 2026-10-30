@@ -1,55 +1,69 @@
 <template>
-  <div class="home-app">
-    <!-- 背景气泡（装饰，不影响交互） -->
-    <div class="home-bubbles" aria-hidden="true">
-      <span v-for="b in bubbles" :key="b.id" :style="b.style"></span>
+  <div class="shell">
+    <!-- 海底装饰层 -->
+    <div class="shell-bubbles" aria-hidden="true">
+      <i v-for="b in bubbles" :key="b.id" :style="b.style"></i>
     </div>
+    <div class="shell-weed" v-for="w in weeds" :key="'w' + w.id" :style="w.style" aria-hidden="true"></div>
+    <div class="shell-floor" aria-hidden="true"></div>
 
+    <!-- 顶栏：品牌 + 导航 + 搜索 + 用户 -->
     <AppTopBar
       :user="user"
-      @toggle="asideOpen = !asideOpen"
+      class="layer"
+      @toggle="drawer = !drawer"
+      @navigate="onNavigate"
       @logout="onLogout"
-      @refresh="loadProfile"
-      @select="onSelect"
+      @refresh="syncProfile"
     />
 
-    <div class="home-body">
-      <AppSideBar :open="asideOpen" @navigate="onNavigate" @close="asideOpen = false" />
+    <div class="layout layer">
+      <AppSideBar :open="drawer" :user="user" @navigate="onNavigate" @close="drawer = false" />
 
-      <main class="home-content">
-        <!-- 欢迎横幅 -->
-        <section class="hero">
-          <div class="hero-text">
-            <p class="hero-hi">{{ greeting }}，{{ displayName }}！</p>
-            <h1 class="hero-title">🍍 欢迎回到蟹堡王后台</h1>
-            <p class="hero-sub">
-              今天是 {{ today }} · 海水 {{ overview.waterTemp }} · {{ overview.weather }}
+      <main class="main">
+        <!-- ① 欢迎横幅（登录页海绵卡片放大版） -->
+        <section class="hero skin">
+          <div class="hero-left">
+            <p class="hero-hi">
+              {{ greeting }}，<b>{{ displayName }}</b>
+              <span class="wave">👋</span>
             </p>
+            <h1 class="hero-title">欢迎回到蟹堡王</h1>
+            <p class="hero-sub">{{ today }} · 比奇堡海水 {{ overview.waterTemp }} · {{ overview.weather }}</p>
+
             <div class="hero-actions">
-              <button class="bob-btn primary" type="button" @click="onNavigate({ to: '/users', built: true })">
+              <button class="pk-btn" type="button" @click="onNavigate({ to: '/users', built: true })">
                 查看居民名单 🐚
               </button>
-              <button class="bob-btn ghost" type="button" :disabled="loading" @click="reload">
+              <button class="pk-btn ghost" type="button" :disabled="loading" @click="reload">
                 {{ loading ? '刷新中…' : '刷新数据 🔄' }}
               </button>
             </div>
           </div>
-          <div class="hero-bob"><SpongeBob /></div>
-        </section>
 
-        <!-- 概览卡片 -->
-        <section class="stats">
-          <div v-for="s in statCards" :key="s.label" class="stat-card">
-            <span class="stat-icon">{{ s.icon }}</span>
-            <b class="stat-num">{{ s.value }}</b>
-            <span class="stat-label">{{ s.label }}</span>
+          <div class="hero-right">
+            <SpongeBob class="hero-bob" />
           </div>
         </section>
 
-        <div class="grid">
-          <!-- 快捷入口 -->
-          <section class="panel">
-            <h2 class="panel-title">⚡ 快捷入口</h2>
+        <!-- ② 概览数字 -->
+        <section class="stats">
+          <article v-for="s in statCards" :key="s.label" class="stat board">
+            <span class="stat-icon">{{ s.icon }}</span>
+            <div class="stat-body">
+              <b class="stat-num">{{ s.value }}</b>
+              <small class="stat-label">{{ s.label }}</small>
+            </div>
+            <span class="stat-trend" :class="s.tone">{{ s.trend }}</span>
+          </article>
+        </section>
+
+        <!-- ③ 快捷入口 + 公告 -->
+        <div class="cols">
+          <section class="panel board">
+            <h2 class="panel-head">
+              <span>⚡ 快捷入口</span>
+            </h2>
             <div class="quick">
               <button
                 v-for="q in QUICK_ACTIONS"
@@ -58,55 +72,59 @@
                 type="button"
                 @click="onNavigate(q)"
               >
-                <span class="quick-icon">{{ q.icon }}</span>
+                <span class="qi-icon">{{ q.icon }}</span>
                 <b>{{ q.title }}</b>
                 <small>{{ q.desc }}</small>
               </button>
             </div>
           </section>
 
-          <!-- 公告 -->
-          <section class="panel">
-            <h2 class="panel-title">📢 比奇堡公告</h2>
+          <section class="panel board">
+            <h2 class="panel-head">
+              <span>📢 比奇堡公告</span>
+              <button class="panel-more" type="button" @click="toast('🚧 公告列表页建设中', 'info')">
+                更多 →
+              </button>
+            </h2>
             <ul class="notice">
               <li v-for="n in notices" :key="n.id">
-                <span class="notice-icon">{{ n.icon }}</span>
-                <span>{{ n.text }}</span>
+                <span class="n-icon">{{ n.icon }}</span>
+                <span class="n-text">{{ n.text }}</span>
               </li>
               <li v-if="!notices.length" class="empty">🫧 暂无公告</li>
             </ul>
           </section>
         </div>
 
-        <!-- 最近居民 -->
-        <section class="panel">
-          <h2 class="panel-title">
-            🐚 最近居民
+        <!-- ④ 最近居民 -->
+        <section class="panel board">
+          <h2 class="panel-head">
+            <span>🐚 最近加入的居民</span>
             <button class="panel-more" type="button" @click="onNavigate({ to: '/users', built: true })">
               查看全部 →
             </button>
           </h2>
 
-          <div class="resident-list">
-            <div v-for="u in residents" :key="u.id" class="resident">
-              <span class="resident-avatar">{{ u.avatar }}</span>
-              <div class="resident-main">
+          <div class="residents">
+            <article v-for="u in residents" :key="u.id" class="resident">
+              <span class="r-avatar">{{ u.avatar || emojiOf(u.username) }}</span>
+              <div class="r-main">
                 <b>{{ u.nickname || u.username }}</b>
-                <small>@{{ u.username }} · {{ u.createTime }}</small>
+                <small>@{{ u.username }}</small>
               </div>
-              <span class="tag" :class="u.status === 1 ? 'on' : 'off'">
+              <span class="pk-tag" :class="u.status === 1 ? 'on' : 'off'">
                 {{ u.status === 1 ? '正常' : '禁用' }}
               </span>
-            </div>
-            <div v-if="!residents.length" class="empty">🫧 还没有居民数据</div>
+            </article>
+            <p v-if="!residents.length" class="empty">🫧 还没有居民数据</p>
           </div>
         </section>
 
-        <p class="foot-note">
-          <span v-if="usingMock">🫧 当前展示的是本地示例数据（后端接口 <code>/api/home/*</code> 尚未实现，接口就绪后会自动切换）</span>
-          <span v-else>✅ 数据来自后端接口</span>
-          <span class="dot">·</span>
-          <span>令牌有效期至 {{ user.tokenExpire || '-' }}</span>
+        <p class="footnote">
+          <template v-if="usingMock">
+            🫧 部分区域是本地示例数据（<code>/api/home/*</code> 后端接口尚未实现，接口就绪后自动切换）
+          </template>
+          <template v-else>✅ 全部数据来自后端接口</template>
         </p>
       </main>
     </div>
@@ -132,90 +150,116 @@ const overview = ref({})
 const notices = ref([])
 const residents = ref([])
 const loading = ref(false)
-const asideOpen = ref(false)
-const mockFlags = ref({ overview: true, notices: true, residents: true })
+const drawer = ref(false)
+const mock = ref({ overview: true, notices: true, residents: true })
 
-const bubbles = Array.from({ length: 12 }, (_, i) => ({
-  id: i,
-  style: {
-    width: 8 + Math.random() * 22 + 'px',
-    height: 8 + Math.random() * 22 + 'px',
-    left: Math.random() * 100 + '%',
-    animationDuration: 9 + Math.random() * 9 + 's',
-    animationDelay: '-' + (Math.random() * 12).toFixed(1) + 's'
+/* ---------------- 装饰层（随机但一次生成，避免重渲染抖动） ---------------- */
+const bubbles = Array.from({ length: 14 }, (_, i) => {
+  const size = 8 + Math.random() * 20
+  return {
+    id: i,
+    style: {
+      width: size + 'px',
+      height: size + 'px',
+      left: Math.random() * 100 + '%',
+      animationDuration: 10 + Math.random() * 9 + 's',
+      animationDelay: '-' + (Math.random() * 12).toFixed(1) + 's'
+    }
   }
-}))
+})
 
+const weeds = [
+  { id: 1, style: { left: '3%', height: '110px', animationDelay: '0s' } },
+  { id: 2, style: { left: '9%', height: '76px', animationDelay: '.7s' } },
+  { id: 3, style: { left: '88%', height: '132px', animationDelay: '1.2s' } },
+  { id: 4, style: { left: '95%', height: '88px', animationDelay: '.4s' } }
+]
+
+/* ---------------- 展示数据 ---------------- */
 const displayName = computed(() => user.value.nickname || user.value.username || '比奇堡居民')
 
 const hour = new Date().getHours()
-const greeting = hour < 6 ? '夜深了' : hour < 11 ? '早上好' : hour < 14 ? '中午好' : hour < 18 ? '下午好' : '晚上好'
-const today = new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' })
+const greeting =
+  hour < 6 ? '夜深了' : hour < 11 ? '早上好' : hour < 14 ? '中午好' : hour < 18 ? '下午好' : '晚上好'
+const today = new Date().toLocaleDateString('zh-CN', {
+  month: 'long',
+  day: 'numeric',
+  weekday: 'long'
+})
 
 const statCards = computed(() => [
-  { icon: '🐚', label: '比奇堡居民', value: overview.value.residents ?? '-' },
-  { icon: '🍔', label: '今日蟹黄堡', value: overview.value.krabby ?? '-' },
-  { icon: '🧽', label: '在岗员工', value: overview.value.online ?? '-' },
-  { icon: '🌡️', label: '海水温度', value: overview.value.waterTemp ?? '-' }
+  { icon: '🐚', label: '比奇堡居民', value: overview.value.residents ?? '-', trend: '在册', tone: 'flat' },
+  { icon: '🍔', label: '今日蟹黄堡', value: overview.value.krabby ?? '-', trend: '↑ 12%', tone: 'up' },
+  { icon: '🧽', label: '在岗员工', value: overview.value.online ?? '-', trend: '实时', tone: 'flat' },
+  { icon: '🌡️', label: '海水温度', value: overview.value.waterTemp ?? '-', trend: overview.value.weather || '舒适', tone: 'flat' }
 ])
 
-const usingMock = computed(() => Object.values(mockFlags.value).some(Boolean))
+const usingMock = computed(() => Object.values(mock.value).some(Boolean))
+
+// 后端没有 avatar 字段时按用户名给个稳定的小图标
+const EMOJI = ['🧽', '⭐', '🦑', '🦀', '🐟', '🐙', '🦐', '🐿️']
+function emojiOf(name = '') {
+  let sum = 0
+  for (const ch of name) sum += ch.charCodeAt(0)
+  return EMOJI[sum % EMOJI.length]
+}
 
 /* ---------------- 数据加载 ---------------- */
-
 async function loadAll() {
   loading.value = true
   try {
-    const [ov, nt, rs] = await Promise.all([fetchOverview(), fetchNotices(), fetchResidents('', 5)])
-    overview.value = ov
-    mockFlags.value.overview = !!ov._mock
-    notices.value = nt.list
-    mockFlags.value.notices = !!nt._mock
-    residents.value = rs.list
-    mockFlags.value.residents = !!rs._mock
+    const [ov, nt, rs] = await Promise.all([
+      fetchOverview(),
+      fetchNotices(),
+      fetchResidents('', 6)
+    ])
+    overview.value = ov || {}
+    mock.value.overview = !!ov?._mock
+    notices.value = nt?.list || []
+    mock.value.notices = !!nt?._mock
+    residents.value = rs?.list || []
+    mock.value.residents = !!rs?._mock
   } finally {
     loading.value = false
   }
 }
 
-/** 受保护接口：带 Authorization 头校验令牌，并同步最新用户信息 */
-async function loadProfile() {
+// 受保护接口：校验令牌有效性并同步最新资料
+async function syncProfile(silent = false) {
   try {
     const res = await profile()
     if (res.code === 200) {
-      user.value = res.data
-      localStorage.setItem('bob_user', JSON.stringify(res.data))
-      toast('✅ 信息已同步', 'ok')
-    } else {
+      user.value = res.data || {}
+      localStorage.setItem('bob_user', JSON.stringify(res.data || {}))
+      if (!silent) toast('✅ 信息已同步', 'ok')
+    } else if (!silent) {
       toast('❌ ' + (res.msg || '获取信息失败'), 'err')
     }
   } catch (e) {
-    toast('❌ ' + e.message, 'err')
+    if (!silent) toast('❌ ' + e.message, 'err')
   }
 }
 
 function reload() {
   loadAll()
-  loadProfile()
+  syncProfile()
 }
 
 onMounted(async () => {
-  const cached = localStorage.getItem('bob_user')
-  if (cached) {
-    try {
-      user.value = JSON.parse(cached)
-    } catch {
-      user.value = {}
-    }
+  // 先用本地缓存渲染，避免白屏等接口
+  try {
+    user.value = JSON.parse(localStorage.getItem('bob_user') || '{}')
+  } catch {
+    user.value = {}
   }
   await loadAll()
-  await loadProfile()
+  await syncProfile(true)
 })
 
 /* ---------------- 交互 ---------------- */
-
 function onNavigate(item) {
   if (!item) return
+  drawer.value = false
   if (item.built === false) {
     toast(`🚧 「${item.title}」页面建设中，敬请期待`, 'info')
     return
@@ -223,20 +267,11 @@ function onNavigate(item) {
   if (item.to && item.to !== router.currentRoute.value.path) router.push(item.to)
 }
 
-function onSelect(item) {
-  if (!item) return
-  if (item.type === 'keyword') {
-    toast(`🫧 没找到「${item.keyword}」的直达入口，试试点搜索结果吧`, 'info')
-    return
-  }
-  onNavigate(item)
-}
-
 async function onLogout() {
   try {
     await logout() // 通知后端作废令牌
-  } catch (e) {
-    /* 后端不可用时也要清本地，保证能退出 */
+  } catch {
+    /* 后端不可用也要能退出 */
   }
   clearSession()
   router.replace('/login')
@@ -244,206 +279,256 @@ async function onLogout() {
 </script>
 
 <style scoped>
-.home-app {
-  position: relative;
-  min-height: 100vh;
-  background: linear-gradient(180deg, var(--ocean-1) 0%, var(--ocean-2) 55%, var(--ocean-3) 100%);
+.layout {
+  display: flex;
+  align-items: flex-start;
+  flex: 1;
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
 }
 
-/* 背景气泡 */
-.home-bubbles { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
-.home-bubbles span {
-  position: absolute;
-  bottom: -80px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, .9), rgba(255, 255, 255, .12) 60%, rgba(255, 255, 255, .02));
-  border: 1px solid rgba(255, 255, 255, .4);
-  animation: home-rise linear infinite;
-}
-@keyframes home-rise {
-  0%   { transform: translateY(0) scale(.6); opacity: 0; }
-  10%  { opacity: .7; }
-  100% { transform: translateY(-110vh) translateX(24px) scale(1.1); opacity: 0; }
-}
-
-.home-body { position: relative; z-index: 1; display: flex; align-items: flex-start; }
-
-.home-content {
+.main {
   flex: 1;
   min-width: 0;
-  padding: 18px 22px 40px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  padding: 18px 22px 48px;
 }
 
-/* ---------- 欢迎横幅（沿用登录页的海绵卡片风格） ---------- */
+/* ---------------- ① 欢迎横幅 ---------------- */
 .hero {
   display: flex;
   align-items: center;
-  gap: 18px;
-  padding: 24px 28px;
-  color: var(--ink);
-  background:
-    radial-gradient(circle at 20% 30%, var(--sponge-deep) 0 6px, transparent 7px),
-    radial-gradient(circle at 72% 22%, var(--sponge-deep) 0 5px, transparent 6px),
-    radial-gradient(circle at 88% 70%, var(--sponge-deep) 0 8px, transparent 9px),
-    linear-gradient(160deg, #ffe95c, var(--sponge) 60%, var(--sponge-dark));
-  border: 5px solid var(--sponge-border);
-  border-radius: 28px;
-  box-shadow: 0 12px 0 var(--sponge-border), 0 22px 40px rgba(0, 0, 0, .35);
+  gap: 20px;
+  padding: 26px 30px;
 }
-.hero-text { flex: 1; min-width: 0; }
+.hero-left { flex: 1; min-width: 0; }
 .hero-hi { font-size: 15px; font-weight: 800; color: #6b4a00; }
+.hero-hi b { font-size: 17px; }
+.wave { display: inline-block; transform-origin: 70% 80%; animation: wave 2.2s ease-in-out infinite; }
+@keyframes wave {
+  0%, 60%, 100% { transform: rotate(0); }
+  70%, 90% { transform: rotate(16deg); }
+  80% { transform: rotate(-8deg); }
+}
 .hero-title {
-  margin-top: 4px;
-  font-size: 26px; font-weight: 800; letter-spacing: 1px;
-  text-shadow: 2px 2px 0 #fff, 4px 4px 0 rgba(0, 0, 0, .12);
+  margin-top: 2px;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-shadow: 2px 2px 0 #fff, 4px 4px 0 rgba(0, 0, 0, .13);
 }
 .hero-sub { margin-top: 6px; font-size: 13px; color: #7a5400; }
-.hero-actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
-.hero-bob { width: 150px; flex: none; }
-.hero-bob :deep(.bob) { width: 150px; margin: 0; }
+.hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
 
-/* 按钮：全局 .btn 是块级满宽，这里要行内小块，单独定义 */
-.bob-btn {
-  padding: 11px 20px;
-  font-size: 15px; font-weight: 800; font-family: inherit;
-  color: var(--ink); cursor: pointer;
-  border: 4px solid var(--sponge-border); border-radius: 18px;
-  transition: .12s;
+.hero-right {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 168px;
 }
-.bob-btn.primary { background: linear-gradient(180deg, #7ee081, var(--green)); box-shadow: 0 6px 0 var(--green-dark); }
-.bob-btn.primary:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--green-dark); }
-.bob-btn.ghost { background: #fffdf5; box-shadow: 0 6px 0 var(--sponge-border); }
-.bob-btn.ghost:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--sponge-border); }
-.bob-btn:disabled { opacity: .6; cursor: not-allowed; }
+/* SpongeBob 组件自带负上边距（为登录页卡片顶部探头设计），这里抵消掉 */
+.hero-bob { width: 168px; margin: 0; }
+.hero-bob :deep(.bob) { width: 168px; margin: 0; animation-duration: 4.4s; }
 
-/* ---------- 概览卡片 ---------- */
-.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
-.stat-card {
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
-  padding: 16px 12px;
-  background: rgba(255, 253, 245, .94);
-  border: 4px solid var(--sponge-border);
-  border-radius: 20px;
-  box-shadow: 0 6px 0 rgba(169, 123, 0, .55), 0 12px 22px rgba(0, 0, 0, .22);
+/* ---------------- ② 概览数字 ---------------- */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
 }
-.stat-icon { font-size: 24px; }
-.stat-num { font-size: 26px; font-weight: 800; line-height: 1.1; }
-.stat-label { font-size: 12px; color: #7a5400; font-weight: 700; }
+.stat {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 15px 16px;
+}
+.stat-icon {
+  display: grid;
+  place-items: center;
+  width: 44px; height: 44px;
+  flex: none;
+  font-size: 22px;
+  background: rgba(255, 217, 15, .5);
+  border: 3px solid rgba(169, 123, 0, .45);
+  border-radius: 14px;
+}
+.stat-body { display: flex; flex-direction: column; min-width: 0; flex: 1; line-height: 1.2; }
+.stat-num { font-size: 25px; font-weight: 800; }
+.stat-label { font-size: 12px; font-weight: 700; color: #7a5400; }
+.stat-trend {
+  flex: none;
+  padding: 3px 8px;
+  font-size: 11px; font-weight: 800;
+  border-radius: 9px;
+  background: rgba(169, 123, 0, .14);
+  color: #7a5400;
+}
+.stat-trend.up { background: #c8f0cd; color: var(--green-dark); }
 
-/* ---------- 面板 ---------- */
-.grid { display: grid; grid-template-columns: 1.25fr 1fr; gap: 16px; align-items: start; }
-.panel {
-  padding: 16px 18px;
-  background: rgba(255, 253, 245, .94);
-  border: 4px solid var(--sponge-border);
-  border-radius: 20px;
-  box-shadow: 0 6px 0 rgba(169, 123, 0, .55), 0 12px 22px rgba(0, 0, 0, .22);
+/* ---------------- ③ 面板通用 ---------------- */
+.cols {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 16px;
+  align-items: start;
 }
-.panel-title {
-  display: flex; align-items: center; gap: 8px;
-  font-size: 16px; font-weight: 800;
-  padding-bottom: 10px; margin-bottom: 12px;
+.panel { padding: 16px 18px; }
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 11px;
+  margin-bottom: 13px;
+  font-size: 16px;
+  font-weight: 800;
   border-bottom: 3px dashed rgba(169, 123, 0, .45);
 }
 .panel-more {
   margin-left: auto;
-  padding: 4px 10px;
-  font-size: 12px; font-family: inherit; font-weight: 800;
-  color: var(--ocean-1); cursor: pointer;
-  background: #fff; border: 2px solid var(--ocean-1); border-radius: 12px;
+  padding: 4px 11px;
+  font-family: inherit;
+  font-size: 12px; font-weight: 800;
+  color: var(--ocean-1);
+  cursor: pointer;
+  background: #fff;
+  border: 2px solid var(--ocean-1);
+  border-radius: 12px;
 }
 .panel-more:hover { background: var(--ocean-3); }
 
 /* 快捷入口 */
 .quick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .quick-item {
-  display: flex; flex-direction: column; align-items: center; gap: 3px;
-  padding: 12px 8px;
-  font-family: inherit; cursor: pointer;
-  background: #fffdf5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 14px 8px;
+  font-family: inherit;
+  color: var(--ink);
+  cursor: pointer;
+  background: var(--white);
   border: 3px solid rgba(169, 123, 0, .5);
   border-radius: 16px;
   transition: .15s;
 }
-.quick-item:hover { background: var(--sponge); border-color: var(--sponge-border); transform: translateY(-2px); }
-.quick-icon { font-size: 22px; }
+.quick-item:hover {
+  background: var(--sponge);
+  border-color: var(--sponge-border);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 0 var(--sponge-border);
+}
+.qi-icon { font-size: 23px; }
 .quick-item b { font-size: 13px; }
 .quick-item small { font-size: 11px; color: #7a5400; }
 
 /* 公告 */
-.notice { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.notice { list-style: none; display: flex; flex-direction: column; gap: 9px; }
 .notice li {
-  display: flex; gap: 8px; align-items: flex-start;
-  font-size: 13px; line-height: 1.5;
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
   padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.55;
   background: rgba(63, 196, 232, .14);
   border: 2px dashed rgba(169, 123, 0, .4);
   border-radius: 14px;
 }
-.notice-icon { font-size: 16px; }
+.n-icon { flex: none; font-size: 15px; }
+.n-text { flex: 1; }
 
-/* 居民列表 */
-.resident-list { display: flex; flex-direction: column; gap: 8px; }
-.resident {
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 12px;
-  background: #fffdf5;
-  border: 2px solid rgba(169, 123, 0, .35);
-  border-radius: 14px;
+/* ---------------- ④ 居民 ---------------- */
+.residents {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
 }
-.resident-avatar {
-  width: 40px; height: 40px; flex: none;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 22px;
+.resident {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--white);
+  border: 2px solid rgba(169, 123, 0, .36);
+  border-radius: 14px;
+  transition: .13s;
+}
+.resident:hover { border-color: var(--sponge-border); background: rgba(255, 217, 15, .16); }
+.r-avatar {
+  display: grid;
+  place-items: center;
+  width: 38px; height: 38px;
+  flex: none;
+  font-size: 20px;
   background: var(--sponge);
   border: 3px solid var(--sponge-border);
   border-radius: 50%;
 }
-.resident-main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
-.resident-main b { font-size: 14px; }
-.resident-main small { font-size: 12px; color: #7a5400; }
-.tag { padding: 3px 10px; border-radius: 10px; font-size: 12px; font-weight: 700; }
-.tag.on { background: #c8f0cd; color: var(--green-dark); }
-.tag.off { background: #ffd9d3; color: var(--red); }
+.r-main { display: flex; flex-direction: column; min-width: 0; flex: 1; line-height: 1.25; }
+.r-main b { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.r-main small { font-size: 11px; color: #7a5400; }
 
-.empty { text-align: center; padding: 18px; font-size: 13px; color: #7a5400; font-weight: 700; }
+.empty { padding: 20px; font-size: 13px; font-weight: 700; text-align: center; color: #7a5400; }
 
-.foot-note {
-  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-  font-size: 12px; font-weight: 700; color: #fffdf5;
+.footnote {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--white);
   text-shadow: 0 1px 3px rgba(0, 0, 0, .45);
+  padding-bottom: 8px;
 }
-.foot-note code {
+.footnote code {
+  padding: 1px 5px;
   font-family: Consolas, monospace;
   background: rgba(255, 255, 255, .18);
-  padding: 1px 5px; border-radius: 6px;
+  border-radius: 6px;
 }
-.dot { opacity: .7; }
 
-/* ---------- 响应式 ---------- */
-@media (max-width: 1100px) {
+/* ---------------- 响应式 ---------------- */
+@media (max-width: 1180px) {
   .stats { grid-template-columns: repeat(2, 1fr); }
 }
-@media (max-width: 768px) {
-  .home-content { padding: 14px 14px 32px; }
-  .grid { grid-template-columns: 1fr; }
-  .hero { flex-direction: column; text-align: center; padding: 20px; }
-  .hero-actions { justify-content: center; }
-  .hero-bob { width: 120px; }
-  .hero-bob :deep(.bob) { width: 120px; }
-  .quick { grid-template-columns: repeat(2, 1fr); }
+
+@media (max-width: 900px) {
+  .cols { grid-template-columns: 1fr; }
+  .hero-title { font-size: 25px; }
+  .hero-right { width: 132px; }
+  .hero-bob, .hero-bob :deep(.bob) { width: 132px; }
 }
-@media (max-width: 480px) {
-  .hero-title { font-size: 21px; }
-  .stats { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-  .stat-num { font-size: 22px; }
+
+@media (max-width: 768px) {
+  .main { padding: 14px 13px 36px; gap: 13px; }
+  .hero { flex-direction: column-reverse; text-align: center; padding: 22px 18px; gap: 6px; }
+  .hero-actions { justify-content: center; }
+  .hero-right { width: 116px; }
+  .hero-bob, .hero-bob :deep(.bob) { width: 116px; }
+  .quick { grid-template-columns: repeat(3, 1fr); }
   .panel { padding: 14px; }
 }
 
+@media (max-width: 480px) {
+  .hero-title { font-size: 21px; letter-spacing: 1px; }
+  .hero-hi { font-size: 13px; }
+  .hero-hi b { font-size: 15px; }
+  .stats { gap: 10px; }
+  .stat { padding: 12px; gap: 8px; }
+  .stat-icon { width: 36px; height: 36px; font-size: 18px; border-width: 2px; }
+  .stat-num { font-size: 20px; }
+  .stat-trend { display: none; }
+  .quick { grid-template-columns: repeat(2, 1fr); }
+  .residents { grid-template-columns: 1fr; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .home-bubbles span { animation: none !important; }
+  .wave { animation: none; }
+  .quick-item:hover { transform: none; }
 }
 </style>

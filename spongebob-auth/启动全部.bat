@@ -7,26 +7,26 @@ cd /d "%APPDIR%"
 title 比奇堡一键启动 (MySQL + 后端 8081 + 前端 5173)
 
 rem ============================================================
-rem  比奇堡一键启动：开机后只需双击这一个
+rem  比奇堡一键启动：开机后只需要双击这一个
 rem
-rem  它依次做四件事：
-rem    1. 定位后端工程（不用你配置，见下面的 :findBackend）
-rem    2. 确保 MySQL 服务在跑、spongebob_auth 库存在
-rem    3. 启动后端 8081（target 没了会自动重新打包）
-rem    4. 启动前端 5173（node_modules 没了会自动重新安装）
+rem  依次做五件事：
+rem    1. 定位后端工程（纯相对路径优先，见 :findBackend）
+rem    2. 确保 MySQL 服务在跑、spongebob_auth 库存在（不存在就自动建库）
+rem    3. 启动后端 8081（target 被清会自动从缓存恢复 jar 或重新打包）
+rem    4. 启动前端 5173（node_modules 被清会自动从缓存恢复或联网安装）
+rem    5. 自检端口 + 开浏览器
 rem
 rem  脚本内部路径全部相对脚本自身定位，整个文件夹可以搬走。
-rem  唯一无法相对的是「后端工程在另一个盘符」，下面按顺序自动找：
+rem  唯一无法相对的是「后端在另一个盘符」，按这个顺序找：
 rem    1 本项目内的 backend 子目录（推荐，纯相对路径）
 rem    2 环境变量 BOB_BACKEND_DIR
 rem    3 D:\workSpace\springBootTest（当前实际位置）
-rem    4 在常见工作区里扫描「有 pom.xml 且有 启动后端.bat」的目录
-rem  想固定下来就设环境变量 BOB_BACKEND_DIR，或者把后端整个放进 backend 子目录。
+rem    4 扫描常见工作区里「有 pom.xml 且有 启动后端.bat」的目录
+rem  想固定下来就设环境变量 BOB_BACKEND_DIR，或把后端放进 backend 子目录。
 rem ============================================================
 
 set "BACKEND_DIR="
 set "MYSQL="
-set "BROWSER="
 
 echo ============================================
 echo   比奇堡一键启动
@@ -52,7 +52,7 @@ echo.
 if defined BACKEND_DIR (
     echo [3/5] 启动后端（8081）...
     call "!BACKEND_DIR!\启动后端.bat" /nopause
-    if errorlevel 1 echo     [警告] 后端启动失败，前端还是会起，但登录会报网络异常。
+    if errorlevel 1 echo     [警告] 后端启动失败，前端仍会起，但登录会报网络异常。
 ) else (
     echo [3/5] 跳过后端。
 )
@@ -166,7 +166,7 @@ echo     建库完成，三个内置账号已就位。
 exit /b 0
 
 :waitPort
-rem %1=端口  %2=最多等几秒  %3=名称
+rem 参数1=端口  参数2=最多等几秒  参数3=名称
 setlocal enabledelayedexpansion
 set /a _n=0
 :wp_loop
@@ -185,7 +185,7 @@ if errorlevel 1 ping -n 2 127.0.0.1 >nul 2>&1
 goto :wp_loop
 
 :openBrowser
-rem 首个参数是 URL；本机装了浏览器才打开，没装就只打印地址
+rem 参数1=URL；装了浏览器才打开，没装就只打印地址
 set "BROWSER="
 if exist "%ProgramFiles%\Microsoft\Edge\Application\msedge.exe" set "BROWSER=%ProgramFiles%\Microsoft\Edge\Application\msedge.exe"
 if not defined BROWSER if exist "%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe" set "BROWSER=%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe"
@@ -193,7 +193,7 @@ if not defined BROWSER if exist "%ProgramFiles%\Google\Chrome\Application\chrome
 if not defined BROWSER if exist "%LocalAppData%\Google\Chrome\Application\chrome.exe" set "BROWSER=%LocalAppData%\Google\Chrome\Application\chrome.exe"
 if defined BROWSER (
     start "" "%BROWSER%" "%~1"
-    echo 已用 %BROWSER% 打开登录页。
+    echo 已用浏览器打开登录页。
 ) else (
     echo 本机没检测到浏览器，自己打开：%~1
 )

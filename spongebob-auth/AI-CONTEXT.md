@@ -249,12 +249,22 @@ java -jar target/springBootTest-0.0.1-SNAPSHOT.jar --server.port=8081
     此时 MySQL 通常已经跟着系统起来了，脚本会继续往下走，不用管这条警告。
 14. **本机没装浏览器**：`启动全部.bat` 结尾会检测 Edge/Chrome 路径，检测不到就只打印地址，
     不会弹「用什么打开」的窗口。装了浏览器之后它就自动帮你打开登录页。
-15. **两个工程已 `git init`，别重复初始化。** 首次提交：前端 `5941966`、后端 `13b8f75`。
-    **`.bat` 必须在 `.gitattributes` 里标成 `binary`** —— 本机 `core.autocrlf=true`，
-    否则 git 会把 GBK 的 `.bat` 当文本、把 CRLF 规范化成 LF 存库，
-    以后在别的机器/工具检出时脚本会变 LF 结尾，`goto` 和多行括号块直接失效。
-    标了 `binary` 之后 git 字节级保存，改脚本直接 commit 即可。
-    ⚠️ 两边都**没有远端**，历史只在本机磁盘上，磁盘被清则一起没。
+15. **git 现状（2026-10-30 核对）**：前端目录属于**别人的仓库** `shanhaihuaxing093/java`
+    （历史里是 snake-game 等无关内容），本项目文件只是其中一部分，**不要盲目 `git add .` 后提交**；
+    后端**完全没有 git**。两边都没有本项目自己的版本控制 → 源码只在本机磁盘上，被重置就没了。
+16. **`*.bat` 必须在 `.gitattributes` 里标成 `binary`** —— 本机 `core.autocrlf=true`，
+    否则 git 会把 GBK 的 `.bat` 当文本、把 CRLF 规范化成 LF，
+    检出后脚本变 LF 结尾，`goto` 和多行括号块直接失效。本轮已给后端补上这个标记。
+17. **PowerShell 5.1 按 GBK 读无 BOM 的 `.ps1`**：如果 `.ps1` 存成 UTF-8 且含中文，
+    会报「字符串缺少终止符」解析失败（本轮真实踩到）。
+    所以 `tools/check-build.ps1` **故意全用英文纯 ASCII**，改动时保持 ASCII。
+18. **代理端口是动态的**：旧记录写的 `56522` 已失效，本轮实测是 `62237`。
+    不要写死端口，curl 一律 `--noproxy '*'`（或先 `export no_proxy="localhost,127.0.0.1"`）。
+19. **`SysUser.password` 必须 `@JsonIgnore`**：只 `setPassword(null)` 不够，
+    响应体里仍会出现 `"password":null`，验收脚本会判定为泄漏密码。
+20. **AI 在 Bash 里 `&`/`nohup` 起的后端会被沙箱回收**：日志明明有 `Started in 1.7s`，
+    但随后 netstat 就没了。这**不代表启动失败**，常驻必须让用户双击 `.bat`。
+    同理 `cmd.exe` 从 PowerShell 工具调用会被安全策略拦截，所以 AI 无法实测 `.bat`，只能静态检查。
 
 ---
 
@@ -278,11 +288,14 @@ java -jar target/springBootTest-0.0.1-SNAPSHOT.jar --server.port=8081
 | ~~低~~ | ~~移动端适配只做了最小宽度~~ | ✅ 已补：768 / 480 / 360 三档断点 |
 | ~~低~~ | ~~没有 `.gitignore`~~ | ✅ 已补 |
 | ~~低~~ | ~~每次启动都 full build，浪费 10~60 秒~~ | ✅ **本轮已补**：`check-build.ps1` 比时间戳，jar 最新就跳过打包 |
-| **高** | **后端认证代码整包丢失**（2026-10-28 机器重置回滚）：只剩 Application + UserController，pom 也没有 mybatis-plus 了，登录注册全 404 | 复原 13 个 Java 文件 + pom 依赖 + 数据源配置（约定见第 3 节，清单见后端 AI-BOOT.md）；scripts 已复原完 |
-| **高** | **两个工程都没进 git，源码只存在本地磁盘**——后端已经这样整份丢过两回 | 建议 `git init` + 首次提交；至少定期把两份源码压成包放第三方位置 |
-| 中 | 后端只有「查列表」，没有增删改 | 缺：改昵称 / 改密码 / 禁用启用 / 删除用户 |
+| ~~高~~ | ~~后端认证代码整包丢失（2026-10-28 机器重置回滚）：只剩 Application + UserController，pom 也没有 mybatis-plus 了，登录注册全 404~~ | ✅ **2026-10-30 已复原**：15 个 Java 文件 + pom 依赖 + 数据源配置，**28 项验收全通过** |
+| ~~高~~ | ~~两个工程都没进 git，源码只存在本地磁盘~~ | ⚠️ 仍未解决：后端**没有 git**；前端挂在别人的仓库 `shanhaihuaxing093/java` 下，不建议盲目提交 |
+| ~~中~~ | ~~后端只有「查列表」，没有增删改~~ | ✅ **2026-10-30 已补**：改昵称 / 改密码 / 禁用启用 / 删除，后端 4 接口 + 前端操作列，**25 项验收全通过** |
+| ~~高~~ | ~~前端白屏：`App.vue` 引用了 6 个不存在的文件~~ | ✅ **2026-10-30 已补**：`ToastHost` / `AppTopBar` / `AppSideBar` / `nav.js` / `home.js` / `toast.js` 全部重建 |
+| 中 | `/api/home/overview`、`/notices`、`/search` 三个接口未实现 | **用户明确要求先保留、不做后端**。前端已按约定路径调用，失败降级示例数据，实现后自动切换 |
 | 中 | Token 是 UUID 而非 JWT（无自解析、无刷新） | 换 JWT，或加刷新令牌机制 |
 | 中 | 没有 Pinia 状态管理 | 用户量小可先不做（全局 loading 用 reactive 单例代替） |
+| 低 | 其他页面（蟹黄堡菜单 / 订单流水 / 营业报表 / 系统设置）都没做 | **用户明确说先不做**，导航里标 `built: false`，点击只弹「建设中」 |
 | 低 | 没有单元测试 | 前端 Vitest；后端可先用 `Md5Util.main()` 冒烟 |
 | 低 | 没有接口文档 | 加 springdoc-openapi（Swagger UI） |
 | 低 | 过期 token 只在被人访问时才清 | 加个 `@Scheduled` 定时清理 |
@@ -338,6 +351,92 @@ java -jar target/springBootTest-0.0.1-SNAPSHOT.jar --server.port=8081
   `启动前端.bat` / `启动后端.bat` 改为三级兜底（现成 → 解缓存秒级恢复 → 联网/打包），
   装好/打包成功自动更新缓存。实测：依赖压缩 2.2s、恢复 0.5s（代替 45s+ npm ci）
 - 重写前后端两份 `AI-BOOT.md`（当前状态、缓存机制、验证命令、待复原清单）
+
+**第六轮（2026-10-30 · 后端认证代码复原 + 脚本补齐 + 提速实测）**
+
+- 发现后端**又**被重置：`启动后端.bat`、`停止后端.bat`、`tools/`、`sql/`、`AI-BOOT.md`、
+  **全部认证 Java 代码**都不见了；`spongebob_auth` 库也不存在；`~/.bikini-cache` 缓存目录不存在；`.env` 也没了
+- 重建数据库：执行 `sql/spongebob_auth.sql`，三个内置账号回归
+- **复原后端认证代码（15 个 Java 文件）**：
+  `common/R`、`common/GlobalExceptionHandler`、`config/WebConfig`、`config/MybatisPlusConfig`、
+  `controller/AuthController`、`controller/SysUserController`、`dto/LoginDTO`、`dto/RegisterDTO`、
+  `entity/SysUser`、`interceptor/TokenInterceptor`、`mapper/SysUserMapper`、`service/AuthService`、`util/Md5Util`
+- `pom.xml` 补 `mybatis-plus-spring-boot3-starter` + `mybatis-plus-jsqlparser` + `mysql-connector-j`
+- `application-dev.properties` 补数据源 / Hikari / MyBatis-Plus / 令牌有效期；`application.properties` 修好中文注释乱码和 `logging.pattern.file` 写错的值
+- **密码算法验证**：`md5(md5("123456") + "bikini_bottom_spongebob") = 54a66656018f3b1f43e2eef4bd608053`，与 sql 脚本密文精确一致
+- **`SysUser.password` 加 `@JsonIgnore`、`deleted` 也隐藏**：验收脚本会判定响应体里出现 `password` 为泄漏
+- 新建后端 `启动后端.bat` / `停止后端.bat` / `tools/check-build.ps1`（**全英文纯 ASCII**）/ `AI-BOOT.md`
+- `启动后端.bat` 三级兜底：现成 jar → 缓存 jar → 打包；成功后自动更新缓存
+- 重写前端 `启动全部.bat` / `启动前端.bat`：依赖完整性判断改为查 `node_modules/.bin/vite.cmd`
+- 新建 `.env`（此前缺失）
+- 补齐 `.gitattributes`：`*.bat binary`（GBK 脚本被 git 转成 LF 会导致 goto 失效）
+- **实测数据**：打包 9~16.8s、后端启动 1.76s、Vite 0.85s、node_modules 缓存恢复 **0.36s**（对比 npm ci 47s）
+- **28 项接口验收全部通过（0 失败）**
+
+**第七轮（2026-10-30 · 用户增删改全链路 + 白屏真凶）**
+
+- **发现严重问题：前端一直白屏，而之前的记录写着"已完成"是错的。**
+  `App.vue` 引用了 6 个不存在的文件，Vite 报 `Failed to resolve import`：
+  `components/ToastHost.vue`、`components/AppTopBar.vue`、`components/AppSideBar.vue`、
+  `config/nav.js`、`api/home.js`、`utils/toast.js` —— 全部重建。
+  **教训：前端 HTTP 200 只代表 HTML 回来了，必须查 `.vue` 模块有没有 `Failed to resolve`。**
+
+- **用户增删改（后端 + 前端一起）**
+  - 后端新增 4 接口：`PUT /api/user/{id}/nickname`、`PUT /api/user/{id}/password`、
+    `PUT /api/user/{id}/status`、`DELETE /api/user/{id}`
+  - 新增 DTO：`UpdateNicknameDTO`、`UpdatePasswordDTO`
+  - `AuthService` 新增 `findById` / `updateNickname` / `updatePassword` / `setStatus` / `remove`
+  - **安全约束**：只能改自己（越权 → 403）；不能禁自己、不能删自己（→ 400 + 明确中文）；
+    改密码后清 token 强制下线；禁用时清 token
+  - 前端 `api/user.js` 加 4 个方法；`UsersView.vue` 重写为带操作列的表格，
+    自己的行显示「改昵称 / 改密码 / 本人」，他人行显示「禁用或启用 / 删除」，三个弹窗
+  - 新增 `tools/test-crud.sh`：25 项验收，**跑完自动物理清理测试数据**
+
+- **接口返回码分级（本轮确立，别改）**
+  - 越权改别人 → `code:403`
+  - 拒自己（禁/删）、参数非法、原密码错 → `code:400` + 明确中文
+  - 未登录 / 令牌失效 → HTTP 200 + `code:401`
+  - 目标不存在 → `code:400`「用户不存在」
+
+- **按错点清单**
+  - JDK 真实路径是 `C:\Program Files\Zulu\zulu-21`，`C:\Program Files\Java\jdk-21` 不存在（只有 `jdk-17`）
+  - `no_proxy` 环境变量在 Git Bash 下不生效，**必须显式 `curl --noproxy '*'`**
+  - Bash 里 `&` 起的后端会被沙箱回收，跑验收必须"起后端 → 跑脚本 → kill"在**同一次 Bash 调用**内完成
+  - 用管道接 `grep` 判断命令成败会误判（`grep` 无匹配返回 1），要用命令自身退出码
+  - 逻辑删除会在库里留 `deleted=1` 的行，清测试数据要 `delete ... where deleted=1`
+
+- **清理**：数据库恢复为 3 个内置账号、`auto_increment=4`；jar 缓存刷新为含增删改的新版
+- **验收：认证 28 项 + 增删改 25 项 = 53 项全通过，0 失败**
+
+**第八轮（2026-10-30 · 首页重做，只做前端）**
+
+用户要求：登录后跳首页，首页要有**搜索栏 + 导航栏**，风格参照**登录页**；
+**只做前端，不做后端功能，后端接口先保留**；其他页面先不做。
+
+- **新增 `src/styles/home.css`（首页皮肤层）**
+  把登录页 `.sponge-card` / `.ocean` / `.btn` / `.field input` 这套物料，
+  拆成可整页复用的类：`.shell`（海底外壳）、`.skin`（海绵卡片皮肤）、`.board`（奶油面板）、
+  `.pk-btn` / `.pk-input` / `.pk-title` / `.pk-tag`。**不新增颜色，全部沿用 global.css 的 CSS 变量。**
+  `main.js` 里 `import './styles/home.css'`。
+- **`AppTopBar.vue` 重写**：品牌（🍍 比奇堡）→ **顶部导航条**（NAV_ITEMS，≤1180px 只留图标、≤900px 收进抽屉）
+  → **搜索栏**（聚焦弹「试试这些」标签、输入 260ms 防抖、下拉结果、Esc 清空、点空白收起）
+  → 用户菜单（头像 + 昵称 + 在岗状态，下拉含回到前台/居民名单/同步信息/退出）
+- **`AppSideBar.vue` 重写**：顶部用户小卡（头像+昵称+在岗标签）+ 导航列表（图标/标题/副标题/建设中徽标）
+  ≤900px 变抽屉（遮罩 + 滑入）
+- **`HomeView.vue` 重写**：海底装饰层 → 顶栏 → 侧栏 + 主区（欢迎横幅 / 4 个概览数字 /
+  快捷入口 + 公告双栏 / 最近居民卡片网格 / 数据来源脚注）
+- **`config/nav.js` 扩充**：6 个导航项（home、residents、menu、orders、report、settings），
+  只有前两个 `built: true`，其余点击只弹「建设中」toast
+- **`api/home.js` 重写**：三个 `/api/home/*` 接口**保持调用但不做后端实现**，
+  失败自动降级到示例数据并带 `_mock` 标记；`searchAll` 增加了「本地导航项模糊匹配 + 真实居民搜索」组合兜底
+- **踩坑记录**：`SpongeBob.vue` 自带 `margin: -92px auto 6px`（为登录页卡片顶部探头设计），
+  在首页横幅里复用时必须 `margin: 0` 覆盖，否则整个 SVG 会被顶出容器
+- **自查补上的移动端缺陷**：第一版顶栏在 ≤900px 把导航条 `display:none` 收进抽屉，
+  但**没有给抽屉留任何入口** —— `drawer` 状态无人触发，窄屏下用户等于没有菜单。
+  已补：`.hamburger` 按钮（默认 `display:none`，≤900px 显示）+ `defineEmits` 加 `toggle`
+  + HomeView `@toggle="drawer = !drawer"`；并给抽屉打开时锁 `body` 滚动
+- 验证：110 个模块构建通过（1.11s）；产物 188.91 kB / gzip 72.10 kB
+- 用户随后要求停止前后端，已按端口 5173/5174/5175/8081 结束进程并确认端口释放
 
 ---
 
