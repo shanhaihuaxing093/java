@@ -1,0 +1,139 @@
+/* 首页/后台共用的布局与装饰样式（home.css） */
+
+/* ---------------- 页面外壳 ---------------- */
+.shell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* 内容层浮在装饰之上 */
+.layer { position: relative; z-index: 2; }
+
+/* ---------------- 海底装饰 ---------------- */
+.shell-bubbles {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.shell-bubbles i {
+  position: absolute;
+  bottom: -30px;
+  display: block;
+  background: radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.25));
+  border-radius: 50%;
+  animation: bubble-rise linear infinite;
+  opacity: 0.7;
+}
+@keyframes bubble-rise {
+  0% { transform: translateY(0) translateX(0); opacity: 0; }
+  8% { opacity: 0.7; }
+  100% { transform: translateY(-105vh) translateX(18px); opacity: 0; }
+}
+
+.shell-weed {
+  position: absolute;
+  bottom: 26px;
+  z-index: 0;
+  width: 14px;
+  pointer-events: none;
+  background: linear-gradient(180deg, #2fae5b, #157a38);
+  border-radius: 50% 50% 0 0 / 70% 70% 0 0;
+  transform-origin: bottom center;
+  animation: weed-sway 4.6s ease-in-out infinite;
+}
+@keyframes weed-sway {
+  0%, 100% { transform: rotate(-5deg); }
+  50% { transform: rotate(6deg); }
+}
+
+.shell-floor {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 30px;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, #e8cf8f, #caa55a);
+  border-top: 4px solid rgba(169, 123, 0, 0.55);
+}
+
+/* ---------------- 卡片风格 ---------------- */
+/* 奶油纸板卡（面板通用底色） */
+.board {
+  background: rgba(255, 253, 242, 0.94);
+  border: 3px solid rgba(169, 123, 0, 0.45);
+  border-radius: 18px;
+  box-shadow: 0 6px 0 rgba(169, 123, 0, 0.28), 0 14px 30px rgba(0, 20, 40, 0.22);
+  backdrop-filter: blur(6px);
+}
+
+/* 海绵质感的黄皮卡（hero 等） */
+.skin {
+  background:
+    radial-gradient(circle at 16% 24%, rgba(196, 143, 0, 0.35) 0 7px, transparent 8px),
+    radial-gradient(circle at 78% 16%, rgba(196, 143, 0, 0.3) 0 6px, transparent 7px),
+    radial-gradient(circle at 86% 66%, rgba(196, 143, 0, 0.35) 0 8px, transparent 9px),
+    radial-gradient(circle at 32% 82%, rgba(196, 143, 0, 0.3) 0 5px, transparent 6px),
+    linear-gradient(160deg, #ffe95c, var(--sponge) 55%, var(--sponge-dark));
+  border: 4px solid var(--sponge-border);
+  border-radius: 22px;
+  box-shadow: 0 8px 0 var(--sponge-border), 0 20px 40px rgba(0, 20, 40, 0.3);
+}
+
+/* ---------------- 通用按钮 / 标签 ---------------- */
+.pk-btn {
+  padding: 11px 22px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(180deg, #7ee081, var(--green));
+  border: 3px solid var(--sponge-border);
+  border-radius: 15px;
+  box-shadow: 0 5px 0 var(--green-dark);
+  transition: 0.13s;
+}
+.pk-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 7px 0 var(--green-dark); }
+.pk-btn:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 2px 0 var(--green-dark); }
+.pk-btn:disabled { opacity: 0.65; cursor: not-allowed; }
+
+.pk-btn.ghost {
+  color: var(--ink);
+  background: #fff;
+  border-color: var(--sponge-border);
+  box-shadow: 0 5px 0 rgba(169, 123, 0, 0.5);
+}
+.pk-btn.ghost:hover:not(:disabled) { background: rgba(255, 217, 15, 0.35); }
+
+.pk-tag {
+  flex: none;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  border-radius: 999px;
+  border: 2px solid transparent;
+}
+.pk-tag.on {
+  color: var(--green-dark);
+  background: #c8f0cd;
+  border-color: rgba(63, 156, 79, 0.55);
+}
+.pk-tag.off {
+  color: #b23c0e;
+  background: #ffe0d6;
+  border-color: rgba(210, 80, 80, 0.55);
+}
+
+/* ---------------- 动效弱化 ---------------- */
+@media (prefers-reduced-motion: reduce) {
+  .shell-bubbles i,
+  .shell-weed { animation: none; opacity: 0.5; }
+}
