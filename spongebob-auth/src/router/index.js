@@ -4,6 +4,8 @@ import RegisterView from '../views/RegisterView.vue'
 import HomeView from '../views/HomeView.vue'
 import UsersView from '../views/UsersView.vue'
 import NotFoundView from '../views/NotFoundView.vue'
+import AdminLoginView from '../views/admin/AdminLoginView.vue'
+import AdminHomeView from '../views/admin/AdminHomeView.vue'
 
 const routes = [
   // 已登录（本地有令牌）直接进首页，否则去登录页；令牌有效性仍由后端校验
@@ -20,6 +22,14 @@ const routes = [
     path: '/users',
     name: 'users',
     component: UsersView,
+    meta: { requiresAuth: true }
+  },
+  // 后台管理系统：独立登录页（仅登录，无注册）+ 数据管理主页
+  { path: '/admin/login', name: 'adminLogin', component: AdminLoginView },
+  {
+    path: '/admin',
+    name: 'admin',
+    component: AdminHomeView,
     meta: { requiresAuth: true }
   },
   // 404：不再静默重定向到登录页，而是给一个能看懂的页面

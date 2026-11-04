@@ -20,10 +20,11 @@
 | 端 | 目录 | 技术栈 |
 | --- | --- | --- |
 | 前端 | `D:\workSpace\java\spongebob-auth`（WorkBuddy 工作区有同步副本） | Vue 3.5 + Vite 5.4 + vue-router 4 + axios 1.7，**无 UI 库**（纯手写 CSS 主题） |
-| 后端 | `D:\workSpace\springBootTest` | SpringBoot 3.4.5 + MyBatis-Plus 3.5.9 + MySQL 8（**⚠️ 2026-10-28 起认证代码被重置清空，待复原**） |
+| 后端 | `D:\workSpace\springBootTest` | SpringBoot 3.4.5 + **Spring JDBC（spring-boot-starter-jdbc + mysql-connector-j）** + MySQL 8（✅ 2026-11-04 认证已复原：AuthController/UserApiController/TokenHelper/Md5Util，全链路验收通过） |
 
-> **当前状态速览**：前端四页（登录/注册/首页/用户列表）已完成；
-> 后端只剩 `SpringBootTestApplication` + `UserController`，`/api/auth/*`、`/api/user/page` 全 404；
+> **当前状态速览**：前端四页 + 后台管理系统（`/admin/login` 仅登录、`/admin` 概览/公告/居民数据管理，首页导航栏有「后台管理系统」按钮）已完成；
+> 后端认证与用户分页接口已用 Spring JDBC 复原（不依赖 MyBatis-Plus），`/api/auth/*`、`/api/user/*` 全部可用；
+> 首页数据（概览/公告/居民）暂存 localStorage（`src/api/home.js`），后台管理页与首页共用，后端 `/api/home/*` 就绪后替换该文件即可。
 > 启动脚本已含三级兜底 + 秒级缓存恢复（`%USERPROFILE%\.bikini-cache`）。
 > 开机先看 `AI-BOOT.md` 第 0 节。
 
