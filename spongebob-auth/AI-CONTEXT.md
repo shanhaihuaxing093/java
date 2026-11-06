@@ -515,3 +515,16 @@ curl -s http://localhost:5173/api/auth/hello
 
 AI 要确认状态，就三条 curl（见本节最上面）+ `bash tools/test-api.sh`。
 要手工起后端（因为 AI 跑不了 .bat），用第 8 节第 3~4 步那套命令。
+
+### 2026-11-06 会话记录：启动提速
+
+- 后端冷启动 2.32s → **1.52s**（累计 -35%）：lazy-initialization + jmx off +
+  javaw `-XX:TieredStopAtLevel=1 -XX:+UseSerialGC` + AppCDS（`target\app.jsa`，
+  `-XX:SharedArchiveFile`），bat 检测到存档才带参数，缺失自动跳过
+- `启动后端.bat /nopause` 发射后不管 → 一键启动前后端并行；单独双击仍原地等端口
+- 修复 bat 隐患：wait 循环延迟展开（enabledelayedexpansion + !n!）、javaw 日志重定向 log\backend.log
+- 28 项验收回归通过；jar + app.jsa 均已回填 `.bikini-cache`
+- AppCDS 再生成命令（换 JDK/依赖后 CDS mismatch 警告时用）：
+  `cd D:/workSpace/springBootTest && java -XX:ArchiveClassesAtExit=target/app.jsa -Dspring.context.exit=onRefresh -jar target/springBootTest-0.0.1-SNAPSHOT.jar`
+- 沙箱/受控环境注意：分离启动（start /min、Start-Process）的子进程会被回收，
+  AI 手工起后端要用会话内持久方式；真实双击不受影响

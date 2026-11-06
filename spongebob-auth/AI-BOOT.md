@@ -331,3 +331,32 @@ com.fenglin.springboottest
 3. **跑过验收脚本 → 清测试数据**，`sys_user` 必须只剩 3 个内置账号
 4. 更新本文档 **第 0 节的"最后验证时间"和状态表**
 5. 重要变动追加到 `AI-CONTEXT.md` 第 7 节"历次会话"
+
+---
+
+## 9. 2026-11-06 增补：后端第二次丢失后已重建
+
+- **事件**：后端认证源码 + jar 缓存再次丢失（只剩 demo UserController）。已按第 3 节接口约定第三次复原。
+- **重建清单**（全部在 `D:/workSpace/springBootTest`）：
+  - `controller/AuthController`、`controller/UserApiController`、`interceptor/TokenInterceptor`、
+    `mapper/SysUserMapper`（Spring JDBC）、`service/AuthService`（含 BizException）、
+    `entity/SysUser`、`dto/LoginDTO|RegisterDTO`、`util/Md5Util|Result`、`config/WebConfig`、
+    `GlobalExceptionHandler`（根包下）
+  - `pom.xml` 补 `spring-boot-starter-jdbc` + `mysql-connector-j`（runtime）
+  - `application-dev.properties` 补数据源：root/123456，库 spongebob_auth
+  - 新建 `启动后端.bat`（端口检查 → 缓存恢复 jar → mvnw 重打包 三级兜底）
+- **验收**：`tools/test-api.sh` 28/28 通过；经 5173 代理登录 spongebob/123456 成功返回 token。
+- **备份**：源码+pom 已打包在 `%USERPROFILE%\.bikini-cache\springBootTest-src-2026-11-06.tar.gz`，
+  jar 在 `.bikini-cache\springBootTest-0.0.1-SNAPSHOT.jar`。**下次丢源码先解包备份，不用重写。**
+- **新增**：`spongebob-auth\jellyfish-catch.html` 水母捕捞小游戏（独立单文件，双击即玩，与前后端无关）。
+- **教训**：Windows 下用 bash `( ... &)` 起的 java/node 进程会随会话结束被杀；脚本里要用
+  `start /min javaw` 或让脚本自身保持运行。
+
+## 10. 启动提速（2026-11-06 下午）
+- 后端冷启动 2.32s → **1.86s**：`application-dev.properties` 加 `spring.main.lazy-initialization=true` + `spring.jmx.enabled=false`；`启动后端.bat` 的 javaw 加 `-XX:TieredStopAtLevel=1 -XX:+UseSerialGC`
+- `启动后端.bat /nopause`（被一键启动调用）改为**发射后不管**，前后端并行启动；单独双击仍会原地等端口
+- 懒加载副作用：后端起来后第一个请求多花约 300ms 初始化，属正常
+- 28 项验收回归通过；新 jar 已回填 `.bikini-cache`
+- AppCDS 再提速：`target\app.jsa`（30MB 类存档，用 `-Dspring.context.exit=onRefresh -XX:ArchiveClassesAtExit` 生成），
+  `启动后端.bat` 检测到就带 `-XX:SharedArchiveFile`，Spring 启动 1.56s→**1.26s**，28 项回归通过；
+  app.jsa 已备份到 `.bikini-cache`；**换 jar/JDK 后若 CDS 报 mismatch 警告，重新生成一次即可**（不影响正确性）
