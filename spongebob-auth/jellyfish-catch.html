@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>水母大捕捞 · Jellyfish Catch</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
+  body { background:#04182b; font-family:"Microsoft YaHei",sans-serif; overflow:hidden; height:100vh; }
+  canvas { display:block; }
+  #ui { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#fff; }
+  .screen { background:rgba(4,24,43,.92); border:2px solid #2bd4ff; border-radius:20px; padding:32px 40px; text-align:center; box-shadow:0 0 40px rgba(43,212,255,.35); max-width:820px; }
+  h1 { color:#7fe9ff; letter-spacing:4px; margin-bottom:8px; }
+  .sub { color:#9db8c9; margin-bottom:20px; font-size:14px; }
+  .chars { display:flex; gap:16px; justify-content:center; flex-wrap:wrap; margin:12px 0 20px; }
+  .card { width:220px; background:#0a2c4a; border:2px solid #17466e; border-radius:14px; padding:14px; cursor:pointer; transition:.15s; }
+  .card:hover { border-color:#2bd4ff; transform:translateY(-4px); box-shadow:0 6px 20px rgba(43,212,255,.25); }
+  .card h3 { margin:6px 0 4px; font-size:17px; }
+  .card p { font-size:12px; color:#9db8c9; line-height:1.6; }
+  .emoji { font-size:40px; }
+  .btn { background:linear-gradient(180deg,#2bd4ff,#0e86c8); border:none; color:#022; font-weight:bold; font-size:16px; padding:12px 36px; border-radius:30px; cursor:pointer; margin-top:6px; letter-spacing:2px; }
+  .btn:hover { filter:brightness(1.15); }
+  .maps { display:flex; gap:14px; justify-content:center; flex-wrap:wrap; }
+  .mapCard { width:170px; background:#0a2c4a; border:2px solid #17466e; border-radius:12px; padding:12px; cursor:pointer; transition:.15s; }
+  .mapCard:hover { border-color:#2bd4ff; transform:translateY(-3px); }
+  .mapCard p { font-size:11px; color:#9db8c9; margin-top:4px; line-height:1.5; }
+  #hud { position:fixed; top:12px; left:14px; color:#dff6ff; font-size:15px; text-shadow:0 1px 4px #000; display:none; z-index:5; }
+  #hud .skill { color:#ffd75e; }
+  #timer { position:fixed; top:12px; right:16px; color:#fff; font-size:22px; font-weight:bold; text-shadow:0 1px 4px #000; display:none; z-index:5; }
+  #skillBtn { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); display:none; z-index:5;
+    background:rgba(255,215,94,.92); border:none; font-weight:bold; font-size:15px; padding:12px 30px; border-radius:30px; cursor:pointer; letter-spacing:2px; color:#4a3200; }
+  #skillBtn.cd { background:rgba(120,120,120,.6); color:#ccc; cursor:default; }
+  .hide { display:none !important; }
+  .skillTag { display:inline-block; font-size:11px; color:#ffd75e; border:1px solid #ffd75e; border-radius:10px; padding:1px 8px; margin-bottom:6px; }
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+
+<div id="hud">
+  <div id="hudChar"></div>
+  <div>⭐ 得分：<span id="score">0</span></div>
+  <div class="skill">技能冷却：<span id="cd">就绪</span></div>
+</div>
+<div id="timer">60</div>
+<button id="skillBtn">释放技能 (空格)</button>
+
+<div id="ui">
+  <!-- 选角色 -->
+  <div class="screen" id="sc1">
+    <h1>🐠 水母大捕捞 🪼</h1>
+    <div class="sub">选择你的捕手角色 —— 每个角色拥有独一无二的技能</div>
+    <div class="chars" id="charList"></div>
+    <button class="btn" id="toMap">下一步 →</button>
+  </div>
+  <!-- 选地图 -->
+  <div class="screen hide" id="sc2">
+    <h1>🗺️ 选择地图</h1>
+    <div class="sub">不同水域的水母种类与速度不同，危险水母会扣分！</div>
+    <div class="maps" id="mapList"></div>
+    <button class="btn hide" id="start">开始游戏！</button>
+  </div>
+  <!-- 结算 -->
+  <div class="screen hide" id="sc3">
+    <h1>🏆 时间到！</h1>
+    <div style="font-size:40px;margin:14px 0;" id="finalScore"></div>
+    <div class="sub" id="rank"></div>
+    <button class="btn" id="again">再来一局</button>
+  </div>
+</div>
+
+<script>
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+let W, H;
+function resize(){ W = cv.width = innerWidth; H = cv.height = innerHeight; }
+resize(); addEventListener('resize', resize);
+
+/* ---------- 角色 ---------- */
+const CHARACTERS = [
+  { id:'spongebob', name:'海绵宝宝', emoji:'🧽', color:'#ffe135',
+    skill:'超级网兜', desc:'释放巨大的网兜，5 秒内捕获范围翻倍，水母主动被吸过来。',
+    cd:12, dur:5 },
+  { id:'patrick', name:'派大星', emoji:'⭐', color:'#ff8da1',
+    skill:'摇滚冲刺', desc:'瞬间冲刺一段距离并撞晕沿途所有水母，撞晕的水母 4 秒内一碰就捕。',
+    cd:10, dur:0.35 },
+  { id:'squidward', name:'章鱼哥', emoji:'🦑', color:'#7ac0b8',
+    skill:'单簧管音波', desc:'吹奏单簧管发出音波，让全屏水母减速 6 秒，且金水母出现率翻倍。',
+    cd:15, dur:6 },
+];
+
+/* ---------- 地图 ---------- */
+const MAPS = [
+  { id:'bikini', name:'比奇堡浅滩', emoji:'🏖️', desc:'新手友好，水母温柔粉粉的',
+    bg:['#1a6fb5','#4fb3e8'], jelly:['#ff9ec7','#ffd6e8'], speed:1.0, gold:0.10, danger:0 },
+  { id:'deep', name:'深海峡谷', emoji:'🌊', desc:'水母游得快，金水母更多',
+    bg:['#062a4d','#0d5c8c'], jelly:['#9be7ff','#c8f4ff'], speed:1.5, gold:0.22, danger:0.10 },
+  { id:'jelly', name:'水母领域', emoji:'⚡', desc:'高手挑战！水母又快又密，还有危险水母',
+    bg:['#2b0a4d','#5c1a8c'], jelly:['#e0b3ff','#f3e0ff'], speed:2.0, gold:0.25, danger:0.20 },
+];
+
+/* ---------- 状态 ---------- */
+let state='menu', player=null, map=null, jellies=[], particles=[], score=0,
+    timeLeft=60, skillCd=0, skillActive=0, stunnedUntil=0, slowUntil=0, goldBoostUntil=0,
+    keys={}, mouse={x:0,y:0}, spawnT=0, lastT=0;
+
+/* ---------- UI ---------- */
+let selChar=0, selMap=0;
+const $ = id => document.getElementById(id);
+
+function renderChars(){
+  $('charList').innerHTML = CHARACTERS.map((c,i)=>`
+    <div class="card" data-i="${i}" style="${i===selChar?'border-color:#2bd4ff;box-shadow:0 0 16px rgba(43,212,255,.4)':''}">
+      <div class="emoji">${c.emoji}</div>
+      <h3 style="color:${c.color}">${c.name}</h3>
+      <div class="skillTag">${c.skill}</div>
+      <p>${c.desc}</p>
+    </div>`).join('');
+  $('charList').querySelectorAll('.card').forEach(el=>el.onclick=()=>{selChar=+el.dataset.i;renderChars();});
+}
+function renderMaps(){
+  $('mapList').innerHTML = MAPS.map((m,i)=>`
+    <div class="mapCard" data-i="${i}" style="${i===selMap?'border-color:#2bd4ff;box-shadow:0 0 16px rgba(43,212,255,.4)':''}">
+      <div class="emoji" style="font-size:34px">${m.emoji}</div>
+      <h3 style="color:#7fe9ff;font-size:15px">${m.name}</h3>
+      <p>${m.desc}</p>
+    </div>`).join('');
+  $('mapList').querySelectorAll('.mapCard').forEach(el=>el.onclick=()=>{selMap=+el.dataset.i;renderMaps();});
+}
+renderChars(); renderMaps();
+
+$('toMap').onclick = () => { $('sc1').classList.add('hide'); $('sc2').classList.remove('hide'); $('start').classList.remove('hide'); };
+$('start').onclick = startGame;
+$('again').onclick = () => { $('sc3').classList.add('hide'); $('sc2').classList.remove('hide'); $('start').classList.remove('hide'); };
+
+function startGame(){
+  player = CHARACTERS[selChar]; map = MAPS[selMap];
+  score=0; timeLeft=60; skillCd=0; skillActive=0; jellies=[]; particles=[]; stunnedUntil=0; slowUntil=0; goldBoostUntil=0;
+  player.x=W/2; player.y=H/2; player.r=26;
+  state='play';
+  $('ui').classList.add('hide'); $('hud').style.display='block'; $('timer').style.display='block'; $('skillBtn').style.display='block';
+  $('hudChar').innerHTML = `${player.emoji} <b>${player.name}</b> · <span style="color:${player.color}">${player.skill}</span>`;
+  lastT = performance.now();
+}
+
+function useSkill(){
+  if(state!=='play' || skillCd>0) return;
+  skillCd = player.cd;
+  const now = performance.now()/1000;
+  if(player.id==='spongebob'){ skillActive = player.dur; }
+  if(player.id==='patrick'){
+    // 冲刺
+    const dx = (mouse.x - player.x), dy = (mouse.y - player.y);
+    const d = Math.hypot(dx,dy)||1;
+    player.dash = { dx:dx/d, dy:dy/d, left: 260 };
+    stunnedUntil = now + 4;
+    for(const j of jellies){
+      if(Math.hypot(j.x-player.x, j.y-player.y) < 140) j.stun = now+4;
+    }
+  }
+  if(player.id==='squidward'){
+    slowUntil = now + player.dur; goldBoostUntil = now + player.dur;
+    for(let i=0;i<3;i++) particles.push({x:player.x, y:player.y, r:10, life:1, type:'wave', color:'#7ac0b8'});
+  }
+}
+$('skillBtn').onclick = useSkill;
+addEventListener('keydown', e=>{ keys[e.code]=true; if(e.code==='Space'){ e.preventDefault(); useSkill(); } });
+addEventListener('keyup', e=>keys[e.code]=false);
+cv.addEventListener('mousemove', e=>{ mouse.x=e.clientX; mouse.y=e.clientY; });
+cv.addEventListener('touchmove', e=>{ const t=e.touches[0]; mouse.x=t.clientX; mouse.y=t.clientY; e.preventDefault(); }, {passive:false});
+cv.addEventListener('mousedown', ()=>{ if(state==='play') useSkill(); });
+
+/* ---------- 水母 ---------- */
+function spawnJelly(){
+  const now = performance.now()/1000;
+  const isGold = Math.random() < map.gold * (now<goldBoostUntil?2:1);
+  const isDanger = !isGold && map.danger>0 && Math.random()<map.danger;
+  jellies.push({
+    x: Math.random()<.5 ? -30 : W+30,
+    y: 60 + Math.random()*(H-160),
+    vx: (Math.random()<.5?-1:1)*(60+Math.random()*70)*map.speed,
+    vy: (Math.random()-.5)*50*map.speed,
+    r: isDanger?16:(isGold?20:22),
+    gold: isGold, danger: isDanger,
+    wob: Math.random()*6.28, stun:0,
+  });
+}
+
+function burst(x,y,color,n=12){
+  for(let i=0;i<n;i++){
+    const a=Math.random()*6.28, s=60+Math.random()*140;
+    particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,r:3+Math.random()*3,life:0.6,type:'dot',color});
+  }
+}
+
+/* ---------- 游戏循环 ---------- */
+function loop(t){
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.033,(t-lastT)/1000); lastT = t;
+  const now = t/1000;
+
+  // 背景
+  const g = ctx.createLinearGradient(0,0,0,H);
+  if(state!=='play'){ g.addColorStop(0,'#04182b'); g.addColorStop(1,'#062a4d'); }
+  else { g.addColorStop(0,map.bg[0]); g.addColorStop(1,map.bg[1]); }
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+  if(state==='play'){
+    // 计时
+    timeLeft -= dt;
+    $('timer').textContent = Math.ceil(Math.max(0,timeLeft));
+    if(timeLeft<=0){ endGame(); }
+    // 冷却
+    skillCd = Math.max(0, skillCd-dt);
+    skillActive = Math.max(0, skillActive-dt);
+    $('cd').textContent = skillCd>0 ? skillCd.toFixed(1)+'s' : (skillActive>0?'生效中!':'就绪');
+    $('score').textContent = score;
+
+    // 生成水母
+    spawnT -= dt;
+    if(spawnT<=0){ spawnJelly(); spawnT = Math.max(0.25, 0.9 - (60-timeLeft)*0.008); }
+
+    // 移动玩家
+    const spd = 320;
+    let mx=0,my=0;
+    if(keys.KeyA||keys.ArrowLeft) mx-=1; if(keys.KeyD||keys.ArrowRight) mx+=1;
+    if(keys.KeyW||keys.ArrowUp) my-=1; if(keys.KeyS||keys.ArrowDown) my+=1;
+    // 无键盘时跟随鼠标
+    if(!mx&&!my){ const d=Math.hypot(mouse.x-player.x,mouse.y-player.y); if(d>4){ mx=(mouse.x-player.x)/d; my=(mouse.y-player.y)/d; if(d<spd*dt){player.x=mouse.x;player.y=mouse.y;mx=my=0;} } }
+    player.x = Math.max(player.r, Math.min(W-player.r, player.x+mx*spd*dt));
+    player.y = Math.max(player.r, Math.min(H-player.r, player.y+my*spd*dt));
+    // 派大星冲刺
+    if(player.dash && player.dash.left>0){
+      const s=900*dt; player.x+=player.dash.dx*s; player.y+=player.dash.dy*s; player.dash.left-=s;
+      player.x=Math.max(player.r,Math.min(W-player.r,player.x)); player.y=Math.max(player.r,Math.min(H-player.r,player.y));
+    }
+
+    // 水母更新
+    const slow = now<slowUntil ? 0.35 : 1;
+    for(let i=jellies.length-1;i>=0;i--){
+      const j=jellies[i];
+      j.wob+=dt*3;
+      let v=slow;
+      // 海绵宝宝技能：吸附
+      if(skillActive>0 && !j.danger){
+        const dx=player.x-j.x, dy=player.y-j.y, d=Math.hypot(dx,dy)||1;
+        j.x+=dx/d*180*dt; j.y+=dy/d*180*dt;
+      }
+      j.x+=j.vx*v*dt; j.y+=j.vy*v*dt + Math.sin(j.wob)*0.6;
+      if(j.x<-60||j.x>W+60||j.y<-60||j.y>H+60){ jellies.splice(i,1); continue; }
+      // 碰撞
+      const dist=Math.hypot(j.x-player.x,j.y-player.y);
+      const range = skillActive>0 ? player.r*2.6 : player.r+j.r;
+      if(dist<range){
+        if(j.stun>now || player.id==='patrick' && player.dash && player.dash.left>0){
+          // 撞晕直接捕
+          score += j.gold?3:(j.danger?-2:1);
+          burst(j.x,j.y, j.gold?'#ffd75e':(j.danger?'#ff5b5b':map.jelly[0]));
+          jellies.splice(i,1); continue;
+        }
+        if(j.danger){ score-=2; burst(j.x,j.y,'#ff5b5b'); jellies.splice(i,1); continue; }
+        if(dist < player.r+j.r-4){
+          score += j.gold?3:1;
+          burst(j.x,j.y, j.gold?'#ffd75e':map.jelly[0]);
+          jellies.splice(i,1);
+        }
+      }
+    }
+
+    drawPlayer();
+  }
+
+  // 画水母
+  for(const j of jellies){
+    const st = j.stun > now;
+    ctx.save(); ctx.translate(j.x,j.y);
+    if(st){ ctx.globalAlpha=.7; }
+    const col = j.gold?'#ffd75e':(j.danger?'#ff5b5b':map.jelly[0]);
+    // 伞盖
+    ctx.beginPath(); ctx.arc(0,0,j.r,Math.PI,0);
+    ctx.bezierCurveTo(j.r,j.r*0.6, -j.r,j.r*0.6, -j.r,0);
+    ctx.fillStyle=col; ctx.fill();
+    ctx.globalAlpha=.35; ctx.fillStyle='#fff';
+    ctx.beginPath(); ctx.arc(-j.r*0.3,-j.r*0.35,j.r*0.35,0,6.28); ctx.fill();
+    ctx.globalAlpha=1;
+    // 触须
+    ctx.strokeStyle=col; ctx.lineWidth=2;
+    for(let k=-2;k<=2;k++){
+      ctx.beginPath(); ctx.moveTo(k*j.r*0.4, j.r*0.15);
+      ctx.quadraticCurveTo(k*j.r*0.4+Math.sin(j.wob+k)*6, j.r*1.1, k*j.r*0.4+Math.sin(j.wob*1.5+k)*8, j.r*1.9);
+      ctx.stroke();
+    }
+    if(st){ ctx.fillStyle='#fff'; ctx.font='14px sans-serif'; ctx.textAlign='center'; ctx.fillText('💫',0,-j.r-6); }
+    if(j.gold){ ctx.fillStyle='#4a3200'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center'; ctx.fillText('×3',0,4); }
+    if(j.danger){ ctx.fillStyle='#fff'; ctx.font='12px sans-serif'; ctx.textAlign='center'; ctx.fillText('☠',0,4); }
+    ctx.restore();
+  }
+
+  // 粒子
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i]; p.life-=dt;
+    if(p.life<=0){ particles.splice(i,1); continue; }
+    ctx.globalAlpha=Math.max(0,p.life);
+    if(p.type==='wave'){
+      p.r+=200*dt;
+      ctx.strokeStyle=p.color; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,6.28); ctx.stroke();
+    } else {
+      p.x+=p.vx*dt; p.y+=p.vy*dt;
+      ctx.fillStyle=p.color; ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,6.28); ctx.fill();
+    }
+    ctx.globalAlpha=1;
+  }
+
+  // 菜单氛围水母
+  if(state==='menu'){
+    if(jellies.length<8 && Math.random()<0.03) { map=MAPS[1]; spawnJelly(); }
+  }
+}
+requestAnimationFrame(loop);
+
+function drawPlayer(){
+  const p=player;
+  ctx.save(); ctx.translate(p.x,p.y);
+  // 捕获范围提示
+  if(skillActive>0){
+    ctx.globalAlpha=.15; ctx.fillStyle=p.color;
+    ctx.beginPath(); ctx.arc(0,0,p.r*2.6,0,6.28); ctx.fill(); ctx.globalAlpha=1;
+    ctx.strokeStyle=p.color; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(0,0,p.r*2.6,0,6.28); ctx.stroke();
+  }
+  ctx.font='44px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(p.emoji,0,0);
+  ctx.restore();
+}
+
+function endGame(){
+  state='menu'; jellies=[];
+  $('ui').classList.remove('hide');
+  $('hud').style.display='none'; $('timer').style.display='none'; $('skillBtn').style.display='none';
+  $('sc2').classList.add('hide'); $('sc3').classList.remove('hide');
+  $('finalScore').textContent = score + ' 分';
+  const rank = score>=60?'🏆 水母捕捞大师！':score>=35?'🥈 老练的捕手':score>=15?'🥉 还不错哦':'🐠 继续加油！';
+  $('rank').textContent = rank;
+}
+</script>
+</body>
+</html>
