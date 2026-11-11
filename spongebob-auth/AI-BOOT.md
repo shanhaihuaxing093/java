@@ -4,7 +4,7 @@
 > 不要重新探测环境，不要重新设计架构，不要 clean 重建，不要反复问用户。
 > 下面写的都是**已经在本机实测过**的事实。冲突时以本文件为准。
 >
-> 最后验证时间：**2026-10-30 16:45**（本轮：**首页重做**，110 模块构建通过 1.11s；认证 28 项 + 增删改 25 项 = 51 项接口验收全通过）
+> 最后验证时间：**2026-11-11 09:11**（本轮：**后端第三次丢失后复原 + 启动提速重建**，认证 28 项验收全通过；Spring 启动 1.29s）
 
 ---
 
@@ -13,7 +13,7 @@
 | 部分 | 状态 |
 | --- | --- |
 | 前端 `D:\workSpace\java\spongebob-auth` | ✅ **首页已重做**：搜索栏 + 顶部导航 + 左侧导航 + 仪表盘 |
-| 后端 `D:\workSpace\springBootTest` | ✅ 认证 + 增删改全部就位，51 项接口验收全通过 |
+| 后端 `D:\workSpace\springBootTest` | ✅ 认证接口已复原（Spring JDBC 版），28 项验收全通过 |
 | MySQL `spongebob_auth` | ✅ 库和 **3 个内置账号**都在 |
 | 启停脚本 | ✅ 前后端各一套，GBK + CRLF，静态检查全通过 |
 | 加速缓存 `%USERPROFILE%\.bikini-cache` | ✅ 已生成（node_modules.zip 13MB + jar 29MB，jar 含增删改） |
@@ -360,3 +360,17 @@ com.fenglin.springboottest
 - AppCDS 再提速：`target\app.jsa`（30MB 类存档，用 `-Dspring.context.exit=onRefresh -XX:ArchiveClassesAtExit` 生成），
   `启动后端.bat` 检测到就带 `-XX:SharedArchiveFile`，Spring 启动 1.56s→**1.26s**，28 项回归通过；
   app.jsa 已备份到 `.bikini-cache`；**换 jar/JDK 后若 CDS 报 mismatch 警告，重新生成一次即可**（不影响正确性）
+
+## 11. 2026-11-11 增补：后端第三次丢失后复原 + 启动提速重建
+- **事件**：后端认证源码、`启动后端.bat`、`.bikini-cache` 全部再次丢失（只剩 demo UserController）。已按第 5 节接口约定**第四次复原**。
+- **本次实现细节（与 2026-11-06 版的差异）**：
+  - 持久层用 **Spring JDBC**（`spring-boot-starter-jdbc` + `mysql-connector-j`），不再用 MyBatis-Plus，依赖更少启动更快
+  - 文件：common/R + GlobalExceptionHandler、config/WebConfig、controller/AuthController + UserApiController、
+    dto/LoginDTO + RegisterDTO、entity/SysUser（`@JsonInclude(NON_NULL)`，否则 null 字段被序列化导致验收"泄漏"误报）、
+    interceptor/TokenInterceptor、mapper/SysUserMapper、service/AuthService（含 BizException）、util/Md5Util
+  - 坑：`jdbc url` 里 `characterEncoding` 只能写 `UTF-8`（写 utf8mb4 连不上）；`localhost` 换成 `127.0.0.1` 更稳
+- **提速（全部保留并实测）**：懒加载 + 关 JMX + `TieredStopAtLevel=1` + `UseSerialGC` + AppCDS `app.jsa`；
+  Spring 启动 **1.29s**（裸 jar 1.55s，历史裸跑 2.32s）。`启动后端.bat /nopause` 发射后不管，前后端并行。
+- **验收**：`tools/test-api.sh` **28/28 通过**；测试用户已清理，`sys_user` 只剩 3 个内置账号。
+- **缓存已回填** `.bikini-cache`：jar 25.8MB + app.jsa 30MB + 源码备份 `springBootTest-src-2026-11-11.tar.gz`。
+- **本轮顺手发现**：MySQL 里 `spongebob_auth` 库也被清了，已用 `sql/spongebob_auth.sql` 重建（3 个内置账号就位）。
