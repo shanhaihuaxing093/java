@@ -4,7 +4,7 @@
 > 不要重新探测环境，不要重新设计架构，不要 clean 重建，不要反复问用户。
 > 下面写的都是**已经在本机实测过**的事实。冲突时以本文件为准。
 >
-> 最后验证时间：**2026-11-11 09:11**（本轮：**后端第三次丢失后复原 + 启动提速重建**，认证 28 项验收全通过；Spring 启动 1.29s）
+> 最后验证时间：**2026-11-16 11:40**（本轮：**后端第四次丢失后复原 + 数据库重建**，认证 28 项 + 增删改 22 项全通过；Spring 启动 1.51s）
 
 ---
 
@@ -12,11 +12,11 @@
 
 | 部分 | 状态 |
 | --- | --- |
-| 前端 `D:\workSpace\java\spongebob-auth` | ✅ **首页已重做**：搜索栏 + 顶部导航 + 左侧导航 + 仪表盘 |
-| 后端 `D:\workSpace\springBootTest` | ✅ 认证接口已复原（Spring JDBC 版），28 项验收全通过 |
-| MySQL `spongebob_auth` | ✅ 库和 **3 个内置账号**都在 |
-| 启停脚本 | ✅ 前后端各一套，GBK + CRLF，静态检查全通过 |
-| 加速缓存 `%USERPROFILE%\.bikini-cache` | ✅ 已生成（node_modules.zip 13MB + jar 29MB，jar 含增删改） |
+| 前端 `D:\workSpace\java\spongebob-auth` | ✅ 首页 + 登录/注册 + 居民名单 + 后台管理页全通 |
+| 后端 `D:\workSpace\springBootTest` | ✅ 认证接口已复原（Spring JDBC 版，16 个类），28+22 项验收全通过 |
+| MySQL `spongebob_auth` | ✅ 库和 **3 个内置账号**都在（本轮用 `sql/spongebob_auth.sql` 重建） |
+| 启停脚本 | ✅ 前端 5 个 + 后端 `启动后端.bat`/`停止后端.bat`（本轮补建），GBK + CRLF 自检通过 |
+| 加速缓存 `%USERPROFILE%\.bikini-cache` | ⚠️ 本轮丢失后**未重建**，脚本会自动走联网安装/打包 |
 
 **一句话：登录后进入的 `/home` 是完整仪表盘 —— 顶部有品牌/导航/搜索/用户菜单，左侧有导航，右侧是欢迎横幅、4 个概览数字、快捷入口、公告、最近居民。**
 
@@ -361,8 +361,7 @@ com.fenglin.springboottest
   `启动后端.bat` 检测到就带 `-XX:SharedArchiveFile`，Spring 启动 1.56s→**1.26s**，28 项回归通过；
   app.jsa 已备份到 `.bikini-cache`；**换 jar/JDK 后若 CDS 报 mismatch 警告，重新生成一次即可**（不影响正确性）
 
-## 11. 2026-11-11 增补：后端第三次丢失后复原 + 启动提速重建
-- **事件**：后端认证源码、`启动后端.bat`、`.bikini-cache` 全部再次丢失（只剩 demo UserController）。已按第 5 节接口约定**第四次复原**。
+## 11. 2026-11-11 增补：后端第三次丢失后复原 + 启动提速重建- **事件**：后端认证源码、`启动后端.bat`、`.bikini-cache` 全部再次丢失（只剩 demo UserController）。已按第 5 节接口约定**第四次复原**。
 - **本次实现细节（与 2026-11-06 版的差异）**：
   - 持久层用 **Spring JDBC**（`spring-boot-starter-jdbc` + `mysql-connector-j`），不再用 MyBatis-Plus，依赖更少启动更快
   - 文件：common/R + GlobalExceptionHandler、config/WebConfig、controller/AuthController + UserApiController、
@@ -374,3 +373,26 @@ com.fenglin.springboottest
 - **验收**：`tools/test-api.sh` **28/28 通过**；测试用户已清理，`sys_user` 只剩 3 个内置账号。
 - **缓存已回填** `.bikini-cache`：jar 25.8MB + app.jsa 30MB + 源码备份 `springBootTest-src-2026-11-11.tar.gz`。
 - **本轮顺手发现**：MySQL 里 `spongebob_auth` 库也被清了，已用 `sql/spongebob_auth.sql` 重建（3 个内置账号就位）。
+
+## 12. 2026-11-16 增补：后端第四次丢失后复原（当前版本）
+- **事件**：后端只剩 demo `UserController`（无认证代码）、`启动后端.bat` 丢失、`.bikini-cache` 整个目录丢失、
+  MySQL 里 `spongebob_auth` 库也不存在了。前端 `src` 完整无损。
+- **复原清单**（包名统一 `com.fenglin.springboottest`）：
+  - `common/R.java`（含 `R.page()` 输出 IPage 形状）、`common/GlobalExceptionHandler.java`（含 BizException）
+  - `config/WebConfig.java`（拦截 `/api/**`，放行 hello/check/login/register + CORS）
+  - `controller/AuthController.java`、`controller/SysUserController.java`
+  - `dto/LoginDTO|RegisterDTO|UpdateNicknameDTO|UpdatePasswordDTO`
+  - `entity/SysUser.java`（**password/token/deleted 用 `@JsonIgnore`**，防止泄漏）
+  - `interceptor/TokenInterceptor.java`、`mapper/SysUserMapper.java`（Spring JDBC）、
+    `service/AuthService.java`、`util/Md5Util.java`
+  - `pom.xml` 补 `spring-boot-starter-jdbc` + `mysql-connector-j`(runtime)
+  - `application-dev.properties` 补数据源（127.0.0.1:3306/spongebob_auth，**characterEncoding=UTF-8**）+ 懒加载 + 关 JMX
+  - 补建 `启动后端.bat`、`停止后端.bat`，并把 `tools/bat-to-gbk.py`、`tools/check-bat.py` 也复制一份到后端工程
+- **新增** `tools/test-crud.sh`（22 项增删改验收，跑完自动物理清理测试数据）
+- **验收**：`test-api.sh` **28/28**、`test-crud.sh` **22/22**；浏览器实测 登录→`/home`→`/users` 真实数据、禁用/删除/越权拦截全部正确。
+- **经验（重要）**：本机沙箱下 bash `nohup`/`&` 起的 java/node **会被回收**。
+  - 后端：用 Windows **计划任务**（`javaw.exe` + `-jar ... --server.port=8081`）可稳定常驻；
+  - 前端：`npm run dev` 能起来但会被回收，**最稳的是双击 `启动前端.bat`**（cmd 窗口挂着）。
+  - 前端进程一死，`agent-browser` 页面就变空白 → 截图验收必须「起服务 + 浏览器操作」放在**同一个 bash 脚本里连续跑完**。
+  - `agent-browser screenshot` 的路径要写 **Windows 绝对路径**（`C:\...`），Git Bash 的 `/c/...` 会报 os error 3。
+- **注意**：`.bikini-cache` 目前是空的，首次双击脚本会走联网 `npm install`（约 40s）和 `mvnw package`（约 20s），属正常。
