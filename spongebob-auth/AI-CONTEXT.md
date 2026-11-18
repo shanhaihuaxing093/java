@@ -38,7 +38,7 @@
 | 后端目录 | `D:\workSpace\springBootTest`（**认证代码 2026-10-28 被重置清空，待复原**） |
 | 依赖缓存 | `%USERPROFILE%\.bikini-cache\`：`spongebob-node_modules.zip`（恢复 0.5s）+ 后端成品 jar（robocopy 秒级恢复），开机重置**不会**清掉它，启动脚本自动用、自动更新 |
 | 前端开发端口 | **5173**（`VITE_PORT`；被占用时 Vite 自动顺延 5174） |
-| 代理规则 | `/api` → `http://localhost:8081`（`vite.config.js` 读 `.env` 的 `VITE_BACKEND_URL`） |
+| 代理规则 | `/api` → `http://192.168.68.8:8081`（本地 IP，`vite.config.js` 读 `.env` 的 `VITE_BACKEND_URL`；后端 `server.address=0.0.0.0`，localhost 仍可用） |
 | 后端端口 | **8081**（`application-dev.properties` 的 `server.port`；`spring.profiles.active=dev`） |
 | **后端必须先启动** | 否则前端登录注册报「网络异常，请检查后端是否已启动」 |
 | Node / npm | v22.22.2 / 10.9.7（PATH 可用） |
@@ -149,6 +149,11 @@ D:\workSpace\springBootTest\                    （后端，⚠️ 2026-10-28 �
 | `profile()` | `GET /api/auth/profile` | **是** |
 | `logout()` | `POST /api/auth/logout` | **是** |
 | `userPage({page,size,keyword})` | `GET /api/user/page`，`data` 是 IPage 形状 | **是** |
+| `uploadFile(file)` | `POST /api/file/upload`（multipart，字段 `file`） | **是** |
+| `filePage({page,size,type,keyword})` | `GET /api/file/page` | **是** |
+| `removeFile(id)` | `DELETE /api/file/{id}` | **是** |
+| `previewUrl(id)` | `GET /api/file/preview/{id}`（`<img>` 直连） | 否 |
+| `downloadUrl(id)` | `GET /api/file/download/{id}`（`<a>` 直连） | 否 |
 
 统一返回体：`{ code, msg, data }`，**`code === 200` 才算成功**。
 `code`：200 成功 / 400 业务失败 / 401 令牌失效 / 403 账号禁用 / 500 服务端异常。

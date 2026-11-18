@@ -4,7 +4,7 @@
 > 不要重新探测环境，不要重新设计架构，不要 clean 重建，不要反复问用户。
 > 下面写的都是**已经在本机实测过**的事实。冲突时以本文件为准。
 >
-> 最后验证时间：**2026-11-16 11:40**（本轮：**后端第四次丢失后复原 + 数据库重建**，认证 28 项 + 增删改 22 项全通过；Spring 启动 1.51s）
+> 最后验证时间：**2026-11-18 08:43**（本轮：**后端源码再次丢失→重建 + 新增文件上传功能**，认证 28 项 + 增删改 22 项 + 文件接口 10 项端到端全通过）
 
 ---
 
@@ -12,11 +12,33 @@
 
 | 部分 | 状态 |
 | --- | --- |
-| 前端 `D:\workSpace\java\spongebob-auth` | ✅ 首页 + 登录/注册 + 居民名单 + 后台管理页全通 |
-| 后端 `D:\workSpace\springBootTest` | ✅ 认证接口已复原（Spring JDBC 版，16 个类），28+22 项验收全通过 |
-| MySQL `spongebob_auth` | ✅ 库和 **3 个内置账号**都在（本轮用 `sql/spongebob_auth.sql` 重建） |
-| 启停脚本 | ✅ 前端 5 个 + 后端 `启动后端.bat`/`停止后端.bat`（本轮补建），GBK + CRLF 自检通过 |
-| 加速缓存 `%USERPROFILE%\.bikini-cache` | ⚠️ 本轮丢失后**未重建**，脚本会自动走联网安装/打包 |
+| 前端 `D:\workSpace\java\spongebob-auth` | ✅ 首页 + 登录/注册 + 居民名单 + **文件中心（新增）** + 后台管理页全通；`npm run build` 通过 |
+| 后端 `D:\workSpace\springBootTest` | ✅ 2026-11-18 重建（MyBatis-Plus 版，21 个类），认证 28 + CRUD 22 项全通过；**新增 `/api/file/**` 上传/列表/预览/下载/删除** |
+| MySQL `spongebob_auth` | ✅ 库和 **3 个内置账号**都在；**新增 `sys_file` 表**（文件元信息） |
+| 上传目录 | ✅ 后端工作目录下 `uploads/yyyy/MM/dd/`，已配静态映射 `/uploads/**` |
+| 后端脚本 | ✅ 2026-11-18 重建 `启动后端.bat`/`停止后端.bat`（GBK+CRLF+无BOM，自检通过），支持 /force /nopause，jar 三级兜底 |
+| 加速缓存 `%USERPROFILE%\.bikini-cache` | ✅ 2026-11-18 已重建：`spongebob-node_modules.zip`(41M) + `springBootTest-0.0.1-SNAPSHOT.jar`(31M，已验证可运行)，脚本可秒级恢复 |
+
+> 🌐 **本地 IP 已切换为 `192.168.68.8`（2026-11-18）**：前端 API 地址（`.env`/`.env.example`/`vite.config.js`/`request.js`）、
+> 验收脚本、启停脚本提示地址全部改用 `http://192.168.68.8:8081`；后端用 `server.address=0.0.0.0`
+> 监听所有网卡（本地 IP 与 localhost **都可用**，避免 DHCP 换 IP 起不来）。局域网设备访问
+> `http://192.168.68.8:5173`。下文 curl 自检命令里的 localhost 仍有效，不是遗漏。
+
+### 🆕 2026-11-18 新增：文件上传功能（图片 + 附件）
+
+- **前端**：`src/api/file.js` + `src/views/FilesView.vue`（路由 `/files`，需登录）+ `config/nav.js` 加「文件中心」入口。
+  支持拖拽/点击多文件上传、进度条、图片缩略图预览、附件图标、按图片/附件筛选、文件名搜索、分页、下载、删除、大图弹窗。
+- **后端**：`entity/SysFile`、`mapper/SysFileMapper`、`service/FileService`、`controller/FileController`。
+  - `POST /api/file/upload`（multipart 字段名 `file`，需令牌）
+  - `GET /api/file/page?page=&size=&type=image|attachment&keyword=`（需令牌）
+  - `GET /api/file/preview/{id}`（放令牌，供 `<img>` 直连）
+  - `GET /api/file/download/{id}`（放令牌，`Content-Disposition` 原文件名）
+  - `DELETE /api/file/{id}`（需令牌，DB 逻辑删除 + 物理文件删除）
+- **安全**：扩展名白名单（图片 jpg/png/gif/webp…，附件 pdf/doc/xls/zip/mp4…），
+  黑名单拒绝 jsp/php/exe/bat/sh…；单文件 20MB 上限；UUID 改名 + 日期分目录；放目录穿越校验。
+- **配置**：`application-dev.properties` 的 `bikini.upload.dir` / `bikini.upload.max-size` 可调。
+- ⚠️ **坑**：分页插件必须独立成 `MybatisPlusConfig`，若写进 `WebConfig` 会与
+  `TokenInterceptor → SysUserMapper → MybatisPlusAutoConfiguration` 形成循环依赖导致启动失败。
 
 **一句话：登录后进入的 `/home` 是完整仪表盘 —— 顶部有品牌/导航/搜索/用户菜单，左侧有导航，右侧是欢迎横幅、4 个概览数字、快捷入口、公告、最近居民。**
 
@@ -244,6 +266,11 @@ com.fenglin.springboottest
 | `PUT /api/user/{id}/password` | 改密码，body `{oldPassword,newPassword}` | **只能改自己**；成功后清 token 强制下线 |
 | `PUT /api/user/{id}/status?status=` | `1` 启用 / `0` 禁用 | 不能禁用自己；禁用时清 token |
 | `DELETE /api/user/{id}` | 逻辑删除 | 不能删除自己；删后搜不到、不能登录 |
+| `POST /api/file/upload` | 上传文件（multipart，字段 `file`） | 需令牌 |
+| `GET /api/file/page` | 分页列表 `?page=&size=&type=&keyword=` | 需令牌 |
+| `GET /api/file/preview/{id}` | 图片预览流 | 免令牌（供 `<img>` 直连） |
+| `GET /api/file/download/{id}` | 附件下载流，原文件名 | 免令牌（供 `<a>` 直连） |
+| `DELETE /api/file/{id}` | 删除（DB + 物理文件） | 需令牌 |
 
 **安全约束（实测过，别改坏）：**
 - 越权改别人 → `code:403`「没有权限修改其他用户的信息」
@@ -294,7 +321,7 @@ com.fenglin.springboottest
 | `src/api/user.js` | 登录/分页/**增删改 4 个方法** | UsersView |
 | `src/api/home.js` | 首页数据，失败降级 Mock（带 `_mock`） | HomeView / AppTopBar |
 | `src/views/LoginView.vue` | 登录页 | 路由 `/login` |
-| `src/views/RegisterView.vue` | 注册页 | 路由 `/register` |
+| `src/views/RegisterView.vue` | 注册页（**注册成功后弹欢迎层，不再立即跳转**） | 路由 `/register` ⚠️ |
 | `src/views/HomeView.vue` | **首页（2026-10-30 重做）**：欢迎横幅 + 概览 + 快捷入口 + 公告 + 居民 | 路由 `/home` |
 | `src/views/UsersView.vue` | 用户管理，**带操作列和 3 个弹窗** | 路由 `/users` |
 | `src/components/ToastHost.vue` | 全局提示渲染 | App.vue ⚠️ |
@@ -304,7 +331,8 @@ com.fenglin.springboottest
 | `src/utils/toast.js` | `toast()` / `toasts` / `closeToast()` | ToastHost + 各视图 ⚠️ |
 | `src/styles/home.css` | **首页皮肤层**：把登录页物料放大成整页布局 | main.js |
 | `src/components/OceanBg.vue` | 登录/注册页的海底背景 | Login/Register/Users |
-| `src/components/SpongeBob.vue` | 海绵宝宝 SVG（**自带 -92px 上边距**，复用时必须重置） | Login/Home |
+| `src/components/SpongeBob.vue` | 海绵宝宝 SVG（**自带 -92px 上边距**，复用时必须重置） | Login/Home ⚠️ |
+| `src/components/WelcomeOverlay.vue` | **注册成功欢迎层**：海绵宝宝跳舞 + `speechSynthesis` 中文语音（尖嗓音模仿），7s 兜底自动跳转，可跳过；视频钩子 `videoUrl` 默认空 | RegisterView ⚠️ |
 | `.env` | `VITE_PORT` / `VITE_BACKEND_URL` 等 | vite.config.js ⚠️ |
 
 ⚠️ 标了叹号的是本轮新补的。**改 `App.vue` 引用前先 `ls` 确认文件真的在。**

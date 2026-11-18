@@ -70,14 +70,14 @@ call :waitPort 5173 30 前端
 echo.
 echo ============================================
 echo   启动流程结束
-echo     前端   http://localhost:5173/login
-echo     后端   http://localhost:8081/api/auth/hello
+echo     前端   http://192.168.68.8:5173/login
+echo     后端   http://192.168.68.8:8081/api/auth/hello
 echo     账号   spongebob / 123456
 echo            patrick、squidward 密码相同
 echo ============================================
 echo.
 
-call :openBrowser "http://localhost:5173/login"
+call :openBrowser "http://192.168.68.8:5173/login"
 
 echo 停止服务：双击 停止全部.bat
 echo.

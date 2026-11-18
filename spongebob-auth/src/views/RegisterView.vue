@@ -57,6 +57,13 @@
         <router-link to="/login">去登录</router-link>
       </div>
     </main>
+
+    <!-- 注册成功后的海绵宝宝欢迎语音 / 动画 -->
+    <WelcomeOverlay
+      v-if="showWelcome"
+      :nickname="welcomeNickname"
+      @done="goLogin"
+    />
   </OceanBg>
 </template>
 
@@ -65,6 +72,7 @@ import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import OceanBg from '../components/OceanBg.vue'
 import SpongeBob from '../components/SpongeBob.vue'
+import WelcomeOverlay from '../components/WelcomeOverlay.vue'
 import { register, checkUsername } from '../api/auth'
 
 const router = useRouter()
@@ -72,6 +80,15 @@ const form = reactive({ username: '', nickname: '', password: '', confirm: '' })
 const loading = ref(false)
 const tips = ref('')
 const tipsType = ref('')
+
+// 注册成功后的欢迎弹层
+const showWelcome = ref(false)
+const welcomeNickname = ref('')
+
+function goLogin() {
+  showWelcome.value = false
+  router.push('/login')
+}
 
 // 用户名重复性校验（失焦时触发）
 async function checkUser() {
@@ -117,8 +134,10 @@ async function onSubmit() {
     })
     if (res.code === 200) {
       tipsType.value = 'ok'
-      tips.value = '✅ 注册成功，正在跳转到登录页...'
-      setTimeout(() => router.push('/login'), 800)
+      tips.value = '✅ 注册成功！海绵宝宝有话对你说~'
+      // 不再立即跳转，先播放欢迎语音 / 动画，播完由弹层触发 goLogin
+      welcomeNickname.value = form.nickname || form.username
+      showWelcome.value = true
     } else {
       tipsType.value = 'err'
       tips.value = '❌ ' + (res.msg || '注册失败')

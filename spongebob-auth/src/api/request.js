@@ -4,7 +4,7 @@ import { startLoading, stopLoading } from '../utils/loading'
 // 参数全部来自 .env.development（见 .env.example），改后端地址不用动源码
 const BASE_URL = import.meta.env.VITE_API_BASE || '/api'
 const TIMEOUT = Number(import.meta.env.VITE_API_TIMEOUT || 10000)
-const BACKEND_HINT = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8081'
+const BACKEND_HINT = import.meta.env.VITE_BACKEND_URL || 'http://192.168.68.8:8081'
 
 const request = axios.create({
   baseURL: BASE_URL,

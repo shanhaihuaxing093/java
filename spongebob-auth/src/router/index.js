@@ -3,6 +3,7 @@ import LoginView from '../views/LoginView.vue'
 import RegisterView from '../views/RegisterView.vue'
 import HomeView from '../views/HomeView.vue'
 import UsersView from '../views/UsersView.vue'
+import FilesView from '../views/FilesView.vue'
 import NotFoundView from '../views/NotFoundView.vue'
 import AdminLoginView from '../views/admin/AdminLoginView.vue'
 import AdminHomeView from '../views/admin/AdminHomeView.vue'
@@ -22,6 +23,12 @@ const routes = [
     path: '/users',
     name: 'users',
     component: UsersView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/files',
+    name: 'files',
+    component: FilesView,
     meta: { requiresAuth: true }
   },
   // 后台管理系统：独立登录页（仅登录，无注册）+ 数据管理主页

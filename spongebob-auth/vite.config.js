@@ -6,7 +6,7 @@ import vue from '@vitejs/plugin-vue'
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
-  const BACKEND = env.VITE_BACKEND_URL || 'http://localhost:8081'
+  const BACKEND = env.VITE_BACKEND_URL || 'http://192.168.68.8:8081'
   const API_BASE = env.VITE_API_BASE || '/api'
   const PORT = Number(env.VITE_PORT || 5173)
 
@@ -17,7 +17,7 @@ export default defineConfig(({ mode }) => {
       host: '0.0.0.0',
       open: false,
       proxy: {
-        // 键来自环境变量：/api → http://localhost:8081
+        // 键来自环境变量：/api → http://192.168.68.8:8081
         [API_BASE]: {
           target: BACKEND,
           changeOrigin: true

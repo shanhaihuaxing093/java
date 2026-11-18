@@ -50,3 +50,29 @@ INSERT IGNORE INTO sys_user (username, password, nickname, avatar, status) VALUE
 
 -- ---------------- 校验 ----------------
 SELECT id, username, nickname, avatar, status, create_time FROM sys_user;
+
+-- ---------------- 文件表 ----------------
+-- 图片 / 附件的元信息；文件本体存放在后端 uploads 目录，按日期分目录
+CREATE TABLE IF NOT EXISTS sys_file (
+  id            BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  original_name VARCHAR(255) NOT NULL                COMMENT '原始文件名',
+  stored_name   VARCHAR(255) NOT NULL                COMMENT '存储文件名(UUID.扩展名)',
+  file_path     VARCHAR(500) NOT NULL                COMMENT '相对路径(日期/存储名)',
+  file_size     BIGINT       NOT NULL DEFAULT 0      COMMENT '文件大小(字节)',
+  content_type  VARCHAR(120) DEFAULT NULL            COMMENT 'MIME类型',
+  file_type     VARCHAR(20)  NOT NULL DEFAULT 'attachment' COMMENT '类型 image-图片 / attachment-附件',
+  extension     VARCHAR(20)  DEFAULT NULL            COMMENT '扩展名(小写)',
+  uploader_id   BIGINT       DEFAULT NULL            COMMENT '上传者ID',
+  uploader_name VARCHAR(50)  DEFAULT NULL            COMMENT '上传者用户名',
+  download_count INT         NOT NULL DEFAULT 0      COMMENT '下载次数',
+  deleted       TINYINT      NOT NULL DEFAULT 0      COMMENT '逻辑删除 0-未删 1-已删',
+  upload_time   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '上传时间',
+  PRIMARY KEY (id),
+  KEY idx_file_type (file_type),
+  KEY idx_uploader (uploader_id)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COMMENT = '文件表（图片/附件）';
+
+-- 校验文件表
+SELECT id, original_name, file_type, file_size FROM sys_file;

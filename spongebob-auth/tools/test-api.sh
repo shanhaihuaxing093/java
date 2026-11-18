@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # 后端接口验收脚本（Agent 自动化验证用，不属于交付物）
-API="http://localhost:8081/api"
-export no_proxy="localhost,127.0.0.1"
-export NO_PROXY="localhost,127.0.0.1"
+API="http://192.168.68.8:8081/api"
+export no_proxy="localhost,127.0.0.1,192.168.68.8"
+export NO_PROXY="localhost,127.0.0.1,192.168.68.8"
 C="curl -s -m 5"
 
 pass=0; fail=0
